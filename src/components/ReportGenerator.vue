@@ -89,7 +89,7 @@
 <script setup lang="ts">
 import { ref, computed, watch, onMounted, onUnmounted, nextTick, useSlots } from 'vue'
 import jsPDF from 'jspdf'
-import html2canvas from 'html2canvas-pro'
+import html2canvas from 'html2canvas'
 
 // Props
 const props = withDefaults(defineProps<{

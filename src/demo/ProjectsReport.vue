@@ -1,6 +1,4 @@
 <script setup lang="ts">
-import { ref } from 'vue'
-
 const projectNames = ['AI Платформа', 'CRM v3', 'Мобильное приложение', 'Миграция облака', 'ERP интеграция', 'BI Дашборд', 'API Gateway', 'Микросервисы', 'DevOps CI/CD', 'Безопасность', 'Рефакторинг', 'Тестирование', 'Документация', 'Аналитика', 'Чат-бот']
 const clients = ['ТехноПром', 'ФинБанк', 'МедиаГрупп', 'РитейлМакс', 'ЛогистикПро', 'ЭнергоСбыт', 'СтройИнвест']
 const statuses = ['Активен', 'Завершён', 'На паузе', 'Планирование']
@@ -32,7 +30,6 @@ const tasks = Array.from({ length: 80 }, (_, i) => ({
   deadline: `2025-${String((i % 12) + 1).padStart(2, '0')}-${String((i % 28) + 1).padStart(2, '0')}`,
 }))
 
-// Сводные метрики
 const summaryMetrics = [
   ['Всего проектов', projects.length.toString()],
   ['Активных', projects.filter(p => p.status === 'Активен').length.toString()],
@@ -49,156 +46,150 @@ const summaryMetrics = [
 
 <template>
   <div>
-    <!-- Титульная страница -->
     <div class="report-page">
       <div class="text-center py-12">
-        <div class="text-6xl mb-6">📋</div>
-        <h1 class="text-3xl font-bold text-gray-800 mb-4">Отчёт по проектам</h1>
-        <h2 class="text-xl text-gray-600 mb-8">ООО "ПроектМастер"</h2>
-        <div class="border-t border-b border-gray-200 py-4 my-8">
+        <div class="icon-large">📋</div>
+        <h1>Отчёт по проектам</h1>
+        <p class="text-xl text-gray-600 mb-8">ООО "ПроектМастер"</p>
+        <div class="border-t border-b py-4 my-8">
           <p class="text-gray-500">Портфель проектов 2025</p>
         </div>
       </div>
     </div>
 
-    <!-- Реестр проектов (часть 1) -->
     <div class="report-page">
-      <h2 class="text-2xl font-bold text-gray-800 border-b pb-2 mb-6">Реестр проектов</h2>
-      <table class="w-full border-collapse text-xs">
+      <h2>Реестр проектов</h2>
+      <table>
         <thead>
-          <tr class="bg-gray-100">
-            <th class="border border-gray-300 px-2 py-1.5 text-left">ID</th>
-            <th class="border border-gray-300 px-2 py-1.5 text-left">Название</th>
-            <th class="border border-gray-300 px-2 py-1.5 text-left">Клиент</th>
-            <th class="border border-gray-300 px-2 py-1.5 text-left">Статус</th>
-            <th class="border border-gray-300 px-2 py-1.5 text-left">Приоритет</th>
-            <th class="border border-gray-300 px-2 py-1.5 text-right">Бюджет</th>
-            <th class="border border-gray-300 px-2 py-1.5 text-right">Потрачено</th>
-            <th class="border border-gray-300 px-2 py-1.5 text-right">Прогресс</th>
-            <th class="border border-gray-300 px-2 py-1.5 text-left">Дедлайн</th>
-            <th class="border border-gray-300 px-2 py-1.5 text-center">Команда</th>
+          <tr>
+            <th style="text-align: left">ID</th>
+            <th style="text-align: left">Название</th>
+            <th style="text-align: left">Клиент</th>
+            <th style="text-align: left">Статус</th>
+            <th style="text-align: left">Приоритет</th>
+            <th style="text-align: right">Бюджет</th>
+            <th style="text-align: right">Потрачено</th>
+            <th style="text-align: right">Прогресс</th>
+            <th style="text-align: left">Дедлайн</th>
+            <th style="text-align: center">Команда</th>
           </tr>
         </thead>
         <tbody>
-          <tr v-for="(p, i) in projects.slice(0, 15)" :key="i" :class="i % 2 ? 'bg-gray-50' : ''">
-            <td class="border border-gray-300 px-2 py-1 font-mono">{{ p.id }}</td>
-            <td class="border border-gray-300 px-2 py-1">{{ p.name }}</td>
-            <td class="border border-gray-300 px-2 py-1">{{ p.client }}</td>
-            <td class="border border-gray-300 px-2 py-1">{{ p.status }}</td>
-            <td class="border border-gray-300 px-2 py-1">{{ p.priority }}</td>
-            <td class="border border-gray-300 px-2 py-1 text-right">{{ p.budget.toLocaleString('ru-RU') }}т₽</td>
-            <td class="border border-gray-300 px-2 py-1 text-right">{{ p.spent.toLocaleString('ru-RU') }}т₽</td>
-            <td class="border border-gray-300 px-2 py-1 text-right">{{ p.progress }}%</td>
-            <td class="border border-gray-300 px-2 py-1">{{ p.deadline }}</td>
-            <td class="border border-gray-300 px-2 py-1 text-center">{{ p.team }}</td>
+          <tr v-for="(p, i) in projects.slice(0, 15)" :key="i">
+            <td style="font-family: monospace">{{ p.id }}</td>
+            <td>{{ p.name }}</td>
+            <td>{{ p.client }}</td>
+            <td>{{ p.status }}</td>
+            <td>{{ p.priority }}</td>
+            <td style="text-align: right">{{ p.budget.toLocaleString('ru-RU') }}т₽</td>
+            <td style="text-align: right">{{ p.spent.toLocaleString('ru-RU') }}т₽</td>
+            <td style="text-align: right">{{ p.progress }}%</td>
+            <td>{{ p.deadline }}</td>
+            <td style="text-align: center">{{ p.team }}</td>
           </tr>
         </tbody>
       </table>
     </div>
 
-    <!-- Реестр проектов (часть 2) -->
     <div class="report-page">
-      <h2 class="text-2xl font-bold text-gray-800 border-b pb-2 mb-6">Реестр проектов (продолжение)</h2>
-      <table class="w-full border-collapse text-xs">
+      <h2>Реестр проектов (продолжение)</h2>
+      <table>
         <thead>
-          <tr class="bg-gray-100">
-            <th class="border border-gray-300 px-2 py-1.5 text-left">ID</th>
-            <th class="border border-gray-300 px-2 py-1.5 text-left">Название</th>
-            <th class="border border-gray-300 px-2 py-1.5 text-left">Клиент</th>
-            <th class="border border-gray-300 px-2 py-1.5 text-left">Статус</th>
-            <th class="border border-gray-300 px-2 py-1.5 text-left">Приоритет</th>
-            <th class="border border-gray-300 px-2 py-1.5 text-right">Бюджет</th>
-            <th class="border border-gray-300 px-2 py-1.5 text-right">Потрачено</th>
-            <th class="border border-gray-300 px-2 py-1.5 text-right">Прогресс</th>
-            <th class="border border-gray-300 px-2 py-1.5 text-left">Дедлайн</th>
-            <th class="border border-gray-300 px-2 py-1.5 text-center">Команда</th>
+          <tr>
+            <th style="text-align: left">ID</th>
+            <th style="text-align: left">Название</th>
+            <th style="text-align: left">Клиент</th>
+            <th style="text-align: left">Статус</th>
+            <th style="text-align: left">Приоритет</th>
+            <th style="text-align: right">Бюджет</th>
+            <th style="text-align: right">Потрачено</th>
+            <th style="text-align: right">Прогресс</th>
+            <th style="text-align: left">Дедлайн</th>
+            <th style="text-align: center">Команда</th>
           </tr>
         </thead>
         <tbody>
-          <tr v-for="(p, i) in projects.slice(15)" :key="i" :class="i % 2 ? 'bg-gray-50' : ''">
-            <td class="border border-gray-300 px-2 py-1 font-mono">{{ p.id }}</td>
-            <td class="border border-gray-300 px-2 py-1">{{ p.name }}</td>
-            <td class="border border-gray-300 px-2 py-1">{{ p.client }}</td>
-            <td class="border border-gray-300 px-2 py-1">{{ p.status }}</td>
-            <td class="border border-gray-300 px-2 py-1">{{ p.priority }}</td>
-            <td class="border border-gray-300 px-2 py-1 text-right">{{ p.budget.toLocaleString('ru-RU') }}т₽</td>
-            <td class="border border-gray-300 px-2 py-1 text-right">{{ p.spent.toLocaleString('ru-RU') }}т₽</td>
-            <td class="border border-gray-300 px-2 py-1 text-right">{{ p.progress }}%</td>
-            <td class="border border-gray-300 px-2 py-1">{{ p.deadline }}</td>
-            <td class="border border-gray-300 px-2 py-1 text-center">{{ p.team }}</td>
+          <tr v-for="(p, i) in projects.slice(15)" :key="i">
+            <td style="font-family: monospace">{{ p.id }}</td>
+            <td>{{ p.name }}</td>
+            <td>{{ p.client }}</td>
+            <td>{{ p.status }}</td>
+            <td>{{ p.priority }}</td>
+            <td style="text-align: right">{{ p.budget.toLocaleString('ru-RU') }}т₽</td>
+            <td style="text-align: right">{{ p.spent.toLocaleString('ru-RU') }}т₽</td>
+            <td style="text-align: right">{{ p.progress }}%</td>
+            <td>{{ p.deadline }}</td>
+            <td style="text-align: center">{{ p.team }}</td>
           </tr>
         </tbody>
       </table>
     </div>
 
-    <!-- Задачи (часть 1) -->
     <div class="report-page">
-      <h2 class="text-2xl font-bold text-gray-800 border-b pb-2 mb-6">Задачи по проектам</h2>
-      <table class="w-full border-collapse text-xs">
+      <h2>Задачи по проектам</h2>
+      <table>
         <thead>
-          <tr class="bg-gray-100">
-            <th class="border border-gray-300 px-2 py-1.5 text-left">Проект</th>
-            <th class="border border-gray-300 px-2 py-1.5 text-left">Задача</th>
-            <th class="border border-gray-300 px-2 py-1.5 text-left">Исполнитель</th>
-            <th class="border border-gray-300 px-2 py-1.5 text-left">Статус</th>
-            <th class="border border-gray-300 px-2 py-1.5 text-right">Часы</th>
-            <th class="border border-gray-300 px-2 py-1.5 text-left">Дедлайн</th>
+          <tr>
+            <th style="text-align: left">Проект</th>
+            <th style="text-align: left">Задача</th>
+            <th style="text-align: left">Исполнитель</th>
+            <th style="text-align: left">Статус</th>
+            <th style="text-align: right">Часы</th>
+            <th style="text-align: left">Дедлайн</th>
           </tr>
         </thead>
         <tbody>
-          <tr v-for="(t, i) in tasks.slice(0, 40)" :key="i" :class="i % 2 ? 'bg-gray-50' : ''">
-            <td class="border border-gray-300 px-2 py-1 font-mono">{{ t.project }}</td>
-            <td class="border border-gray-300 px-2 py-1">{{ t.task }}</td>
-            <td class="border border-gray-300 px-2 py-1">{{ t.assignee }}</td>
-            <td class="border border-gray-300 px-2 py-1">{{ t.status }}</td>
-            <td class="border border-gray-300 px-2 py-1 text-right">{{ t.hours }}</td>
-            <td class="border border-gray-300 px-2 py-1">{{ t.deadline }}</td>
+          <tr v-for="(t, i) in tasks.slice(0, 40)" :key="i">
+            <td style="font-family: monospace">{{ t.project }}</td>
+            <td>{{ t.task }}</td>
+            <td>{{ t.assignee }}</td>
+            <td>{{ t.status }}</td>
+            <td style="text-align: right">{{ t.hours }}</td>
+            <td>{{ t.deadline }}</td>
           </tr>
         </tbody>
       </table>
     </div>
 
-    <!-- Задачи (часть 2) -->
     <div class="report-page">
-      <h2 class="text-2xl font-bold text-gray-800 border-b pb-2 mb-6">Задачи по проектам (продолжение)</h2>
-      <table class="w-full border-collapse text-xs">
+      <h2>Задачи по проектам (продолжение)</h2>
+      <table>
         <thead>
-          <tr class="bg-gray-100">
-            <th class="border border-gray-300 px-2 py-1.5 text-left">Проект</th>
-            <th class="border border-gray-300 px-2 py-1.5 text-left">Задача</th>
-            <th class="border border-gray-300 px-2 py-1.5 text-left">Исполнитель</th>
-            <th class="border border-gray-300 px-2 py-1.5 text-left">Статус</th>
-            <th class="border border-gray-300 px-2 py-1.5 text-right">Часы</th>
-            <th class="border border-gray-300 px-2 py-1.5 text-left">Дедлайн</th>
+          <tr>
+            <th style="text-align: left">Проект</th>
+            <th style="text-align: left">Задача</th>
+            <th style="text-align: left">Исполнитель</th>
+            <th style="text-align: left">Статус</th>
+            <th style="text-align: right">Часы</th>
+            <th style="text-align: left">Дедлайн</th>
           </tr>
         </thead>
         <tbody>
-          <tr v-for="(t, i) in tasks.slice(40, 80)" :key="i" :class="i % 2 ? 'bg-gray-50' : ''">
-            <td class="border border-gray-300 px-2 py-1 font-mono">{{ t.project }}</td>
-            <td class="border border-gray-300 px-2 py-1">{{ t.task }}</td>
-            <td class="border border-gray-300 px-2 py-1">{{ t.assignee }}</td>
-            <td class="border border-gray-300 px-2 py-1">{{ t.status }}</td>
-            <td class="border border-gray-300 px-2 py-1 text-right">{{ t.hours }}</td>
-            <td class="border border-gray-300 px-2 py-1">{{ t.deadline }}</td>
+          <tr v-for="(t, i) in tasks.slice(40, 80)" :key="i">
+            <td style="font-family: monospace">{{ t.project }}</td>
+            <td>{{ t.task }}</td>
+            <td>{{ t.assignee }}</td>
+            <td>{{ t.status }}</td>
+            <td style="text-align: right">{{ t.hours }}</td>
+            <td>{{ t.deadline }}</td>
           </tr>
         </tbody>
       </table>
     </div>
 
-    <!-- Сводка по проектам -->
     <div class="report-page">
-      <h2 class="text-2xl font-bold text-gray-800 border-b pb-2 mb-6">Сводка по проектам</h2>
-      <table class="w-full border-collapse text-sm">
+      <h2>Сводка по проектам</h2>
+      <table>
         <thead>
-          <tr class="bg-gray-100">
-            <th class="border border-gray-300 px-3 py-2 text-left">Метрика</th>
-            <th class="border border-gray-300 px-3 py-2 text-right">Значение</th>
+          <tr>
+            <th style="text-align: left">Метрика</th>
+            <th style="text-align: right">Значение</th>
           </tr>
         </thead>
         <tbody>
-          <tr v-for="([metric, value], i) in summaryMetrics" :key="i" :class="i % 2 ? 'bg-gray-50' : ''">
-            <td class="border border-gray-300 px-3 py-2 font-medium">{{ metric }}</td>
-            <td class="border border-gray-300 px-3 py-2 text-right font-bold">{{ value }}</td>
+          <tr v-for="([metric, value], i) in summaryMetrics" :key="i">
+            <td style="font-weight: 500">{{ metric }}</td>
+            <td style="text-align: right; font-weight: 700">{{ value }}</td>
           </tr>
         </tbody>
       </table>
