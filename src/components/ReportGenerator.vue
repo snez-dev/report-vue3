@@ -518,7 +518,7 @@ defineExpose({
 }
 
 .report-container {
-  background: #f1f5f9;
+  background: white;
   min-height: 500px;
   max-height: 80vh;
   overflow-y: auto;
@@ -531,7 +531,8 @@ defineExpose({
 }
 
 .report-content {
-  padding: 24px;
+  padding: 0;
+  margin: 0;
 }
 
 :deep(.report-page) {

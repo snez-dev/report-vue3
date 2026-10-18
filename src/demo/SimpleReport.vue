@@ -63,6 +63,38 @@ const avgPrice = Math.round(products.reduce((sum, p) => sum + p.price, 0) / prod
       </div>
     </div>
 
+    <div style="margin-bottom: 2rem;">
+      <h2 style="font-size: 1.5rem; color: #1f2937; border-bottom: 2px solid #e5e7eb; padding-bottom: 0.5rem; margin-bottom: 1rem;">
+        Категории товаров
+      </h2>
+      <div style="display: grid; grid-template-columns: repeat(2, 1fr); gap: 1rem;">
+        <div style="background: #f9fafb; padding: 1rem; border-left: 4px solid #3b82f6;">
+          <div style="font-weight: 600; color: #1f2937; margin-bottom: 0.5rem;">Электроника</div>
+          <div style="color: #6b7280; font-size: 0.875rem;">
+            {{ products.filter(p => p.category === 'Электроника').length }} товаров
+          </div>
+        </div>
+        <div style="background: #f9fafb; padding: 1rem; border-left: 4px solid #10b981;">
+          <div style="font-weight: 600; color: #1f2937; margin-bottom: 0.5rem;">Аксессуары</div>
+          <div style="color: #6b7280; font-size: 0.875rem;">
+            {{ products.filter(p => p.category === 'Аксессуары').length }} товаров
+          </div>
+        </div>
+        <div style="background: #f9fafb; padding: 1rem; border-left: 4px solid #f59e0b;">
+          <div style="font-weight: 600; color: #1f2937; margin-bottom: 0.5rem;">Хранение</div>
+          <div style="color: #6b7280; font-size: 0.875rem;">
+            {{ products.filter(p => p.category === 'Хранение').length }} товаров
+          </div>
+        </div>
+        <div style="background: #f9fafb; padding: 1rem; border-left: 4px solid #8b5cf6;">
+          <div style="font-weight: 600; color: #1f2937; margin-bottom: 0.5rem;">Всего</div>
+          <div style="color: #6b7280; font-size: 0.875rem;">
+            {{ products.length }} позиций
+          </div>
+        </div>
+      </div>
+    </div>
+
     <div>
       <h2 style="font-size: 1.5rem; color: #1f2937; border-bottom: 2px solid #e5e7eb; padding-bottom: 0.5rem; margin-bottom: 1rem;">
         Прайс-лист

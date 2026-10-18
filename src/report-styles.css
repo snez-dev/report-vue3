@@ -2,19 +2,25 @@
 
 .report-page {
   background: white;
-  border: 1px solid #e5e7eb;
-  border-radius: 8px;
-  padding: 40px;
-  margin-bottom: 24px;
-  box-shadow: 0 2px 12px rgba(0, 0, 0, 0.06);
-  min-height: 600px;
+  padding: 20mm;
+  margin: 0;
+  min-height: 257mm;
   position: relative;
-  transition: box-shadow 0.2s;
+  box-sizing: border-box;
 }
 
-.report-page:hover {
-  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.1);
+/* Поддержка колонок */
+.report-page.columns-2 {
+  column-count: 2;
+  column-gap: 10mm;
 }
+
+.report-page.columns-3 {
+  column-count: 3;
+  column-gap: 8mm;
+}
+
+/* Заголовки */
 
 /* Заголовки */
 .report-page h1 {
