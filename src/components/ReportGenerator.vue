@@ -208,22 +208,72 @@ const exportPDF = async () => {
       throw new Error('Нет контента для экспорта')
     }
 
+    // Временный canvas для конвертации oklch() в rgb()
+    const tempCanvas = document.createElement('canvas')
+    tempCanvas.width = tempCanvas.height = 1
+    const tempCtx = tempCanvas.getContext('2d')!
+
+    const convertColor = (color: string): string => {
+      if (!color || !color.includes('oklch')) return color
+      try {
+        tempCtx.fillStyle = color
+        return tempCtx.fillStyle
+      } catch {
+        return color
+      }
+    }
+
+    // Свойства, которые могут содержать oklch()
+    const colorProps = [
+      'color',
+      'background-color',
+      'border-top-color',
+      'border-right-color',
+      'border-bottom-color',
+      'border-left-color',
+      'outline-color',
+      'text-decoration-color',
+      'column-rule-color',
+      'caret-color',
+    ]
+
     for (let i = 0; i < pages.length; i++) {
       if (i > 0) pdf.addPage()
 
-      const imgData = await toPng(pages[i] as HTMLElement, {
-        pixelRatio: 2,
+      const canvas = await html2canvas(pages[i] as HTMLElement, {
+        scale: 2,
+        useCORS: true,
+        logging: false,
         backgroundColor: '#ffffff',
-        cacheBust: true,
+        onclone: (clonedDoc) => {
+          const allElements = clonedDoc.querySelectorAll('*')
+          allElements.forEach((el) => {
+            const htmlEl = el as HTMLElement
+            const computed = window.getComputedStyle(htmlEl)
+
+            colorProps.forEach((prop) => {
+              const value = computed.getPropertyValue(prop)
+              if (value && value.includes('oklch')) {
+                htmlEl.style.setProperty(prop, convertColor(value))
+              }
+            })
+
+            // Обработка box-shadow и text-shadow
+            const boxShadow = computed.getPropertyValue('box-shadow')
+            if (boxShadow && boxShadow.includes('oklch')) {
+              htmlEl.style.setProperty('box-shadow', boxShadow.replace(/oklch\([^)]+\)/g, (m) => convertColor(m)))
+            }
+            const textShadow = computed.getPropertyValue('text-shadow')
+            if (textShadow && textShadow.includes('oklch')) {
+              htmlEl.style.setProperty('text-shadow', textShadow.replace(/oklch\([^)]+\)/g, (m) => convertColor(m)))
+            }
+          })
+        }
       })
 
-      // Получаем размеры изображения для расчёта пропорций
-      const img = new Image()
-      img.src = imgData
-      await new Promise((resolve) => { img.onload = resolve })
-
+      const imgData = canvas.toDataURL('image/png')
       const imgWidth = width - props.margin * 2
-      const imgHeight = (img.height * imgWidth) / img.width
+      const imgHeight = (canvas.height * imgWidth) / canvas.width
 
       pdf.addImage(imgData, 'PNG', props.margin, props.margin, imgWidth, Math.min(imgHeight, height - props.margin * 2))
     }
