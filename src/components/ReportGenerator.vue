@@ -89,7 +89,7 @@
 <script setup lang="ts">
 import { ref, computed, watch, onMounted, onUnmounted, nextTick, useSlots } from 'vue'
 import jsPDF from 'jspdf'
-import html2canvas from 'html2canvas'
+import html2canvas from 'html2canvas-pro'
 
 // Props
 const props = withDefaults(defineProps<{
@@ -207,62 +207,6 @@ const exportPDF = async () => {
     if (!pages || pages.length === 0) {
       throw new Error('Нет контента для экспорта')
     }
-
-    // Временный canvas для конвертации oklch() в rgb()
-    const tempCanvas = document.createElement('canvas')
-    tempCanvas.width = tempCanvas.height = 1
-    const tempCtx = tempCanvas.getContext('2d')!
-
-    const convertColor = (color: string): string => {
-      if (!color || !color.includes('oklch')) return color
-      try {
-        tempCtx.fillStyle = color
-        return tempCtx.fillStyle
-      } catch {
-        return color
-      }
-    }
-
-    // Заменяем все oklch() в строке на rgb()
-    const replaceOklch = (text: string): string => {
-      return text.replace(/oklch\([^)]+\)/g, (match) => convertColor(match))
-    }
-
-    // Рекурсивная замена oklch в CSSRuleList
-    const patchRuleList = (rules: CSSRuleList, parent: CSSStyleSheet | CSSGroupingRule) => {
-      for (let r = rules.length - 1; r >= 0; r--) {
-        const rule = rules[r]
-        if (rule instanceof CSSStyleRule && rule.style.cssText.includes('oklch')) {
-          const selector = rule.selectorText
-          const newCssText = replaceOklch(rule.style.cssText)
-          try {
-            parent.deleteRule(r)
-            parent.insertRule(`${selector} { ${newCssText} }`, r)
-          } catch (e) { /* ignore */ }
-        } else if (rule instanceof CSSGroupingRule) {
-          // Рекурсивно обрабатываем @media, @supports, @layer и т.д.
-          patchRuleList(rule.cssRules, rule)
-        }
-      }
-    }
-
-    // Модифицируем CSSOM оригинального документа — html2canvas читает стили отсюда
-    const patchStylesheets = () => {
-      const sheets = document.styleSheets
-      for (let s = 0; s < sheets.length; s++) {
-        try {
-          patchRuleList(sheets[s].cssRules, sheets[s])
-        } catch (e) { /* CORS */ }
-      }
-    }
-
-    // Патчим CSSOM и <style> textContent
-    patchStylesheets()
-    document.querySelectorAll('style').forEach((styleEl) => {
-      if (styleEl.textContent && styleEl.textContent.includes('oklch')) {
-        styleEl.textContent = replaceOklch(styleEl.textContent)
-      }
-    })
 
     for (let i = 0; i < pages.length; i++) {
       if (i > 0) pdf.addPage()
