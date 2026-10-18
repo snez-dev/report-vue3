@@ -223,19 +223,46 @@ const exportPDF = async () => {
       }
     }
 
-    // Свойства, которые могут содержать oklch()
-    const colorProps = [
-      'color',
-      'background-color',
-      'border-top-color',
-      'border-right-color',
-      'border-bottom-color',
-      'border-left-color',
-      'outline-color',
-      'text-decoration-color',
-      'column-rule-color',
-      'caret-color',
-    ]
+    // Заменяем все oklch() в строке на rgb()
+    const replaceOklch = (text: string): string => {
+      return text.replace(/oklch\([^)]+\)/g, (match) => convertColor(match))
+    }
+
+    // Рекурсивная замена oklch в CSSRuleList
+    const patchRuleList = (rules: CSSRuleList, parent: CSSStyleSheet | CSSGroupingRule) => {
+      for (let r = rules.length - 1; r >= 0; r--) {
+        const rule = rules[r]
+        if (rule instanceof CSSStyleRule && rule.style.cssText.includes('oklch')) {
+          const selector = rule.selectorText
+          const newCssText = replaceOklch(rule.style.cssText)
+          try {
+            parent.deleteRule(r)
+            parent.insertRule(`${selector} { ${newCssText} }`, r)
+          } catch (e) { /* ignore */ }
+        } else if (rule instanceof CSSGroupingRule) {
+          // Рекурсивно обрабатываем @media, @supports, @layer и т.д.
+          patchRuleList(rule.cssRules, rule)
+        }
+      }
+    }
+
+    // Модифицируем CSSOM оригинального документа — html2canvas читает стили отсюда
+    const patchStylesheets = () => {
+      const sheets = document.styleSheets
+      for (let s = 0; s < sheets.length; s++) {
+        try {
+          patchRuleList(sheets[s].cssRules, sheets[s])
+        } catch (e) { /* CORS */ }
+      }
+    }
+
+    // Патчим CSSOM и <style> textContent
+    patchStylesheets()
+    document.querySelectorAll('style').forEach((styleEl) => {
+      if (styleEl.textContent && styleEl.textContent.includes('oklch')) {
+        styleEl.textContent = replaceOklch(styleEl.textContent)
+      }
+    })
 
     for (let i = 0; i < pages.length; i++) {
       if (i > 0) pdf.addPage()
@@ -244,31 +271,7 @@ const exportPDF = async () => {
         scale: 2,
         useCORS: true,
         logging: false,
-        backgroundColor: '#ffffff',
-        onclone: (clonedDoc) => {
-          const allElements = clonedDoc.querySelectorAll('*')
-          allElements.forEach((el) => {
-            const htmlEl = el as HTMLElement
-            const computed = window.getComputedStyle(htmlEl)
-
-            colorProps.forEach((prop) => {
-              const value = computed.getPropertyValue(prop)
-              if (value && value.includes('oklch')) {
-                htmlEl.style.setProperty(prop, convertColor(value))
-              }
-            })
-
-            // Обработка box-shadow и text-shadow
-            const boxShadow = computed.getPropertyValue('box-shadow')
-            if (boxShadow && boxShadow.includes('oklch')) {
-              htmlEl.style.setProperty('box-shadow', boxShadow.replace(/oklch\([^)]+\)/g, (m) => convertColor(m)))
-            }
-            const textShadow = computed.getPropertyValue('text-shadow')
-            if (textShadow && textShadow.includes('oklch')) {
-              htmlEl.style.setProperty('text-shadow', textShadow.replace(/oklch\([^)]+\)/g, (m) => convertColor(m)))
-            }
-          })
-        }
+        backgroundColor: '#ffffff'
       })
 
       const imgData = canvas.toDataURL('image/png')
