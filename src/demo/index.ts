@@ -3,6 +3,7 @@ import SalesReport from './SalesReport.vue'
 import HRReport from './HRReport.vue'
 import ProjectsReport from './ProjectsReport.vue'
 import WarehouseReport from './WarehouseReport.vue'
+import SimpleReport from './SimpleReport.vue'
 import type { Component } from 'vue'
 
 export interface ReportExample {
@@ -78,5 +79,17 @@ export const reportExamples: ReportExample[] = [
     format: 'a4',
     title: 'Складской отчёт',
     company: 'ООО "ЛогистикМакс"',
+  },
+  {
+    icon: '📄',
+    name: 'Простой',
+    desc: 'Авто-пагинация',
+    component: SimpleReport,
+    pages: 0,
+    tablesCount: 1,
+    rowsCount: 20,
+    format: 'a4',
+    title: 'Каталог товаров',
+    company: 'ООО "ТехноМаркет"',
   },
 ]

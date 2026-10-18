@@ -29,17 +29,14 @@
         <slot name="header" :page="currentPage" :total-pages="totalPages" />
       </div>
 
-      <!-- Main Content Slot -->
-      <div class="report-content" ref="reportContent">
-        <slot :page="currentPage" :total-pages="totalPages">
-          <div class="report-page">
-            <p style="color: #999; text-align: center; padding: 40px;">
-              Контент не предоставлен. Используйте slot для вставки содержимого.
-            </p>
-          </div>
-        </slot>
-      </div>
-
+    <!-- Main Content Slot -->
+    <div class="report-content" ref="reportContent">
+      <slot :page="currentPage" :total-pages="totalPages">
+        <p style="color: #999; text-align: center; padding: 40px;">
+          Контент не предоставлен. Используйте slot для вставки содержимого.
+        </p>
+      </slot>
+    </div>
       <!-- Footer Slot -->
       <div class="report-footer" v-if="$slots.footer">
         <slot name="footer" :page="currentPage" :total-pages="totalPages" />
@@ -58,12 +55,12 @@
             <div class="preview-body">
               <div class="preview-pages">
                 <div
-                  v-for="(_, index) in pageElements"
+                  v-for="(_, index) in totalPages"
                   :key="index"
                   class="preview-page"
                 >
                   <div class="preview-page-number">Страница {{ index + 1 }}</div>
-                  <div class="preview-page-content" v-html="pageHTML[index]"></div>
+                  <div class="preview-page-content" v-html="pageHTML[index] || pageHTML[0]"></div>
                 </div>
               </div>
             </div>
@@ -149,8 +146,18 @@ const calculatePages = async () => {
   await nextTick()
   
   const pages = reportContent.value.querySelectorAll('.report-page')
-  pageElements.value = Array.from(pages) as HTMLElement[]
-  totalPages.value = Math.max(1, pages.length)
+  
+  // Если есть ручное деление на страницы
+  if (pages.length > 0) {
+    pageElements.value = Array.from(pages) as HTMLElement[]
+    totalPages.value = pages.length
+  } else {
+    // Автоматический подсчёт страниц по высоте контента
+    const contentHeight = reportContent.value.scrollHeight
+    const pageHeight = pageDimensions.value.height * 3.78 // мм в пиксели (примерно)
+    totalPages.value = Math.max(1, Math.ceil(contentHeight / pageHeight))
+    pageElements.value = []
+  }
 }
 
 const togglePreview = async () => {
@@ -163,8 +170,13 @@ const togglePreview = async () => {
 const updatePreviewHTML = async () => {
   await nextTick()
   const pages = reportContent.value?.querySelectorAll('.report-page')
-  if (pages) {
+  
+  if (pages && pages.length > 0) {
+    // Ручное деление на страницы
     pageHTML.value = Array.from(pages).map(page => (page as HTMLElement).innerHTML)
+  } else if (reportContent.value) {
+    // Автоматическая пагинация - показываем весь контент
+    pageHTML.value = [reportContent.value.innerHTML]
   }
 }
 
@@ -186,8 +198,15 @@ const nextPage = () => {
 
 const scrollToPage = (pageIndex: number) => {
   const pages = reportContent.value?.querySelectorAll('.report-page')
-  if (pages && pages[pageIndex]) {
+  
+  if (pages && pages.length > 0 && pages[pageIndex]) {
+    // Ручное деление - прокручиваем к конкретной странице
     (pages[pageIndex] as HTMLElement).scrollIntoView({ behavior: 'smooth', block: 'start' })
+  } else if (reportContent.value) {
+    // Автоматическая пагинация - прокручиваем к позиции страницы
+    const pageHeight = pageDimensions.value.height * 3.78
+    const scrollPosition = pageIndex * pageHeight
+    reportContent.value.scrollTo({ top: scrollPosition, behavior: 'smooth' })
   }
 }
 
@@ -203,15 +222,38 @@ const exportPDF = async () => {
       format: props.pageSize
     })
 
-    const pages = reportContent.value?.querySelectorAll('.report-page')
-    if (!pages || pages.length === 0) {
+    const contentEl = reportContent.value
+    if (!contentEl) {
       throw new Error('Нет контента для экспорта')
     }
 
-    for (let i = 0; i < pages.length; i++) {
-      if (i > 0) pdf.addPage()
+    // Проверяем наличие ручного деления на страницы
+    const manualPages = contentEl.querySelectorAll('.report-page')
+    
+    if (manualPages.length > 0) {
+      // Режим ручного деления - рендерим каждую страницу отдельно
+      for (let i = 0; i < manualPages.length; i++) {
+        if (i > 0) pdf.addPage()
 
-      const canvas = await html2canvas(pages[i] as HTMLElement, {
+        const canvas = await html2canvas(manualPages[i] as HTMLElement, {
+          scale: 2,
+          useCORS: true,
+          logging: false,
+          backgroundColor: '#ffffff'
+        })
+
+        const imgData = canvas.toDataURL('image/png')
+        const imgWidth = width - props.margin * 2
+        const imgHeight = (canvas.height * imgWidth) / canvas.width
+
+        pdf.addImage(imgData, 'PNG', props.margin, props.margin, imgWidth, Math.min(imgHeight, height - props.margin * 2))
+      }
+
+      pdf.save(`${props.title}.pdf`)
+      emit('export-end', { format: 'pdf', pages: manualPages.length })
+    } else {
+      // Режим автоматической пагинации - рендерим весь контент и разбиваем
+      const canvas = await html2canvas(contentEl, {
         scale: 2,
         useCORS: true,
         logging: false,
@@ -219,14 +261,45 @@ const exportPDF = async () => {
       })
 
       const imgData = canvas.toDataURL('image/png')
+      
+      // Рассчитываем размеры
       const imgWidth = width - props.margin * 2
-      const imgHeight = (canvas.height * imgWidth) / canvas.width
+      
+      // Высота одной страницы в пикселях (с учётом scale)
+      const pageHeightPx = (height - props.margin * 2) * (canvas.width / width)
+      const totalPages = Math.ceil(canvas.height / pageHeightPx)
 
-      pdf.addImage(imgData, 'PNG', props.margin, props.margin, imgWidth, Math.min(imgHeight, height - props.margin * 2))
+      // Добавляем страницы в PDF
+      for (let i = 0; i < totalPages; i++) {
+        if (i > 0) pdf.addPage()
+
+        // Создаём canvas для одной страницы
+        const pageCanvas = document.createElement('canvas')
+        pageCanvas.width = canvas.width
+        pageCanvas.height = Math.min(pageHeightPx, canvas.height - i * pageHeightPx)
+        
+        const ctx = pageCanvas.getContext('2d')!
+        ctx.fillStyle = '#ffffff'
+        ctx.fillRect(0, 0, pageCanvas.width, pageCanvas.height)
+        
+        // Копируем часть изображения
+        ctx.drawImage(
+          canvas,
+          0, i * pageHeightPx,
+          canvas.width, pageCanvas.height,
+          0, 0,
+          pageCanvas.width, pageCanvas.height
+        )
+
+        const pageImgData = pageCanvas.toDataURL('image/png')
+        const pageImgHeight = (pageCanvas.height * imgWidth) / pageCanvas.width
+
+        pdf.addImage(pageImgData, 'PNG', props.margin, props.margin, imgWidth, pageImgHeight)
+      }
+
+      pdf.save(`${props.title}.pdf`)
+      emit('export-end', { format: 'pdf', pages: totalPages })
     }
-
-    pdf.save(`${props.title}.pdf`)
-    emit('export-end', { format: 'pdf', pages: pages.length })
   } catch (error) {
     console.error('Ошибка экспорта PDF:', error)
     emit('error', error as Error)

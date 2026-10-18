@@ -150,7 +150,9 @@ const data = ref([
             <div class="space-y-3">
               <div class="flex justify-between">
                 <span class="text-gray-400 text-sm">Страниц</span>
-                <span class="text-white font-medium">{{ currentReport.pages }}</span>
+                <span class="text-white font-medium">
+                  {{ currentReport.pages > 0 ? currentReport.pages : 'Авто' }}
+                </span>
               </div>
               <div class="flex justify-between">
                 <span class="text-gray-400 text-sm">Таблиц</span>
