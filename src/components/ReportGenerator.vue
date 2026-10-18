@@ -47,27 +47,34 @@
     <!-- Preview Overlay -->
     <Teleport to="body">
       <Transition name="fade">
-        <div v-if="showPreview" class="preview-overlay" @click.self="showPreview = false">
-          <div class="preview-modal">
+        <div v-if="showPreview" class="preview-overlay" @click.self="closePreview">
+          <div class="preview-modal preview-modal-large">
             <div class="preview-header">
-              <h3>📄 Предпросмотр документа</h3>
-              <button @click="showPreview = false" class="btn-close">✕</button>
-            </div>
-            <div class="preview-body">
-              <div class="preview-pages">
-                <div
-                  v-for="(_, index) in totalPages"
-                  :key="index"
-                  class="preview-page"
-                >
-                  <div class="preview-page-number">Страница {{ index + 1 }}</div>
-                  <div class="preview-page-content" v-html="pageHTML[index] || pageHTML[0]"></div>
-                </div>
+              <h3>📄 Предпросмотр PDF</h3>
+              <div class="preview-actions">
+                <button @click="downloadPreviewPDF" class="btn btn-primary" :disabled="!previewUrl">
+                  📥 Скачать PDF
+                </button>
+                <button @click="exportHTML" class="btn btn-secondary">
+                  🌐 Скачать HTML
+                </button>
+                <button @click="closePreview" class="btn-close">✕</button>
               </div>
             </div>
-            <div class="preview-footer">
-              <button @click="exportPDF" class="btn btn-primary">📄 Скачать PDF</button>
-              <button @click="exportHTML" class="btn btn-secondary">🌐 Скачать HTML</button>
+            <div class="preview-body preview-body-iframe">
+              <div v-if="isGeneratingPreview" class="preview-loading">
+                <div class="loading-spinner"></div>
+                <p>Генерация PDF для предпросмотра...</p>
+              </div>
+              <iframe
+                v-else-if="previewUrl"
+                :src="previewUrl"
+                class="preview-iframe"
+                frameborder="0"
+              ></iframe>
+              <div v-else class="preview-error">
+                <p>Не удалось сгенерировать предпросмотр</p>
+              </div>
             </div>
           </div>
         </div>
@@ -123,9 +130,11 @@ const slots = useSlots()
 const currentPage = ref(0)
 const showPreview = ref(false)
 const isExporting = ref(false)
+const isGeneratingPreview = ref(false)
 const totalPages = ref(1)
 const pageHTML = ref<string[]>([])
 const pageElements = ref<HTMLElement[]>([])
+const previewUrl = ref<string | null>(null)
 
 // Computed
 const pageDimensions = computed(() => {
@@ -161,23 +170,132 @@ const calculatePages = async () => {
   }
 }
 
+const generatePDFBlob = async (): Promise<Blob> => {
+  const { width, height } = pageDimensions.value
+  const pdf = new jsPDF({
+    orientation: props.orientation === 'landscape' ? 'l' : 'p',
+    unit: 'mm',
+    format: props.pageSize
+  })
+
+  const contentEl = reportContent.value
+  if (!contentEl) {
+    throw new Error('Нет контента для экспорта')
+  }
+
+  // Проверяем наличие ручного деления на страницы
+  const manualPages = contentEl.querySelectorAll('.report-page')
+  
+  if (manualPages.length > 0) {
+    // Режим ручного деления - рендерим каждую страницу отдельно
+    for (let i = 0; i < manualPages.length; i++) {
+      if (i > 0) pdf.addPage()
+
+      const canvas = await html2canvas(manualPages[i] as HTMLElement, {
+        scale: 2,
+        useCORS: true,
+        logging: false,
+        backgroundColor: '#ffffff'
+      })
+
+      const imgData = canvas.toDataURL('image/png')
+      const imgWidth = width - props.margin * 2
+      const imgHeight = (canvas.height * imgWidth) / canvas.width
+
+      pdf.addImage(imgData, 'PNG', props.margin, props.margin, imgWidth, Math.min(imgHeight, height - props.margin * 2))
+    }
+  } else {
+    // Режим автоматической пагинации - рендерим весь контент и разбиваем
+    const canvas = await html2canvas(contentEl, {
+      scale: 2,
+      useCORS: true,
+      logging: false,
+      backgroundColor: '#ffffff'
+    })
+
+    const imgData = canvas.toDataURL('image/png')
+    
+    // Рассчитываем размеры
+    const imgWidth = width - props.margin * 2
+    
+    // Высота одной страницы в пикселях (с учётом scale)
+    const pageHeightPx = (height - props.margin * 2) * (canvas.width / width)
+    const totalPagesCount = Math.ceil(canvas.height / pageHeightPx)
+
+    // Добавляем страницы в PDF
+    for (let i = 0; i < totalPagesCount; i++) {
+      if (i > 0) pdf.addPage()
+
+      // Создаём canvas для одной страницы
+      const pageCanvas = document.createElement('canvas')
+      pageCanvas.width = canvas.width
+      pageCanvas.height = Math.min(pageHeightPx, canvas.height - i * pageHeightPx)
+      
+      const ctx = pageCanvas.getContext('2d')!
+      ctx.fillStyle = '#ffffff'
+      ctx.fillRect(0, 0, pageCanvas.width, pageCanvas.height)
+      
+      // Копируем часть изображения
+      ctx.drawImage(
+        canvas,
+        0, i * pageHeightPx,
+        canvas.width, pageCanvas.height,
+        0, 0,
+        pageCanvas.width, pageCanvas.height
+      )
+
+      const pageImgData = pageCanvas.toDataURL('image/png')
+      const pageImgHeight = (pageCanvas.height * imgWidth) / pageCanvas.width
+
+      pdf.addImage(pageImgData, 'PNG', props.margin, props.margin, imgWidth, pageImgHeight)
+    }
+  }
+
+  return pdf.output('blob')
+}
+
 const togglePreview = async () => {
   showPreview.value = !showPreview.value
   if (showPreview.value) {
-    await updatePreviewHTML()
+    await generatePreview()
+  } else {
+    cleanupPreview()
   }
 }
 
-const updatePreviewHTML = async () => {
-  await nextTick()
-  const pages = reportContent.value?.querySelectorAll('.report-page')
-  
-  if (pages && pages.length > 0) {
-    // Ручное деление на страницы
-    pageHTML.value = Array.from(pages).map(page => (page as HTMLElement).innerHTML)
-  } else if (reportContent.value) {
-    // Автоматическая пагинация - показываем весь контент
-    pageHTML.value = [reportContent.value.innerHTML]
+const generatePreview = async () => {
+  try {
+    isGeneratingPreview.value = true
+    cleanupPreview()
+    
+    const blob = await generatePDFBlob()
+    previewUrl.value = URL.createObjectURL(blob)
+  } catch (error) {
+    console.error('Ошибка генерации предпросмотра:', error)
+    emit('error', error as Error)
+  } finally {
+    isGeneratingPreview.value = false
+  }
+}
+
+const closePreview = () => {
+  showPreview.value = false
+  cleanupPreview()
+}
+
+const cleanupPreview = () => {
+  if (previewUrl.value) {
+    URL.revokeObjectURL(previewUrl.value)
+    previewUrl.value = null
+  }
+}
+
+const downloadPreviewPDF = () => {
+  if (previewUrl.value) {
+    const a = document.createElement('a')
+    a.href = previewUrl.value
+    a.download = `${props.title}.pdf`
+    a.click()
   }
 }
 
@@ -216,13 +334,6 @@ const exportPDF = async () => {
     isExporting.value = true
     emit('export-start')
 
-    const { width, height } = pageDimensions.value
-    const pdf = new jsPDF({
-      orientation: props.orientation === 'landscape' ? 'l' : 'p',
-      unit: 'mm',
-      format: props.pageSize
-    })
-
     const contentEl = reportContent.value
     if (!contentEl) {
       throw new Error('Нет контента для экспорта')
@@ -230,77 +341,19 @@ const exportPDF = async () => {
 
     // Проверяем наличие ручного деления на страницы
     const manualPages = contentEl.querySelectorAll('.report-page')
+    const pageCount = manualPages.length > 0 ? manualPages.length : Math.ceil(contentEl.scrollHeight / (pageDimensions.value.height * 3.78))
+
+    const blob = await generatePDFBlob()
     
-    if (manualPages.length > 0) {
-      // Режим ручного деления - рендерим каждую страницу отдельно
-      for (let i = 0; i < manualPages.length; i++) {
-        if (i > 0) pdf.addPage()
+    // Скачиваем файл
+    const url = URL.createObjectURL(blob)
+    const a = document.createElement('a')
+    a.href = url
+    a.download = `${props.title}.pdf`
+    a.click()
+    URL.revokeObjectURL(url)
 
-        const canvas = await html2canvas(manualPages[i] as HTMLElement, {
-          scale: 2,
-          useCORS: true,
-          logging: false,
-          backgroundColor: '#ffffff'
-        })
-
-        const imgData = canvas.toDataURL('image/png')
-        const imgWidth = width - props.margin * 2
-        const imgHeight = (canvas.height * imgWidth) / canvas.width
-
-        pdf.addImage(imgData, 'PNG', props.margin, props.margin, imgWidth, Math.min(imgHeight, height - props.margin * 2))
-      }
-
-      pdf.save(`${props.title}.pdf`)
-      emit('export-end', { format: 'pdf', pages: manualPages.length })
-    } else {
-      // Режим автоматической пагинации - рендерим весь контент и разбиваем
-      const canvas = await html2canvas(contentEl, {
-        scale: 2,
-        useCORS: true,
-        logging: false,
-        backgroundColor: '#ffffff'
-      })
-
-      const imgData = canvas.toDataURL('image/png')
-      
-      // Рассчитываем размеры
-      const imgWidth = width - props.margin * 2
-      
-      // Высота одной страницы в пикселях (с учётом scale)
-      const pageHeightPx = (height - props.margin * 2) * (canvas.width / width)
-      const totalPages = Math.ceil(canvas.height / pageHeightPx)
-
-      // Добавляем страницы в PDF
-      for (let i = 0; i < totalPages; i++) {
-        if (i > 0) pdf.addPage()
-
-        // Создаём canvas для одной страницы
-        const pageCanvas = document.createElement('canvas')
-        pageCanvas.width = canvas.width
-        pageCanvas.height = Math.min(pageHeightPx, canvas.height - i * pageHeightPx)
-        
-        const ctx = pageCanvas.getContext('2d')!
-        ctx.fillStyle = '#ffffff'
-        ctx.fillRect(0, 0, pageCanvas.width, pageCanvas.height)
-        
-        // Копируем часть изображения
-        ctx.drawImage(
-          canvas,
-          0, i * pageHeightPx,
-          canvas.width, pageCanvas.height,
-          0, 0,
-          pageCanvas.width, pageCanvas.height
-        )
-
-        const pageImgData = pageCanvas.toDataURL('image/png')
-        const pageImgHeight = (pageCanvas.height * imgWidth) / pageCanvas.width
-
-        pdf.addImage(pageImgData, 'PNG', props.margin, props.margin, imgWidth, pageImgHeight)
-      }
-
-      pdf.save(`${props.title}.pdf`)
-      emit('export-end', { format: 'pdf', pages: totalPages })
-    }
+    emit('export-end', { format: 'pdf', pages: pageCount })
   } catch (error) {
     console.error('Ошибка экспорта PDF:', error)
     emit('error', error as Error)
@@ -399,6 +452,7 @@ onMounted(() => {
 
 onUnmounted(() => {
   window.removeEventListener('resize', calculatePages)
+  cleanupPreview()
 })
 
 // Expose methods
@@ -600,6 +654,12 @@ defineExpose({
   overflow: hidden;
 }
 
+.preview-modal-large {
+  max-width: 95%;
+  width: 1200px;
+  height: 95vh;
+}
+
 .preview-header {
   display: flex;
   justify-content: space-between;
@@ -607,6 +667,12 @@ defineExpose({
   padding: 16px 24px;
   border-bottom: 1px solid #e5e7eb;
   background: #f8fafc;
+}
+
+.preview-actions {
+  display: flex;
+  gap: 12px;
+  align-items: center;
 }
 
 .preview-header h3 {
@@ -636,6 +702,34 @@ defineExpose({
   overflow-y: auto;
   padding: 24px;
   background: #f3f4f6;
+}
+
+.preview-body-iframe {
+  padding: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: #525659;
+}
+
+.preview-iframe {
+  width: 100%;
+  height: 100%;
+  border: none;
+}
+
+.preview-loading,
+.preview-error {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  color: white;
+  gap: 16px;
+}
+
+.preview-error {
+  color: #fca5a5;
 }
 
 .preview-pages {

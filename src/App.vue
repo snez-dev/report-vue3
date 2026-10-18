@@ -117,14 +117,25 @@ const data = ref([
     </header>
 
     <div class="max-w-7xl mx-auto px-4 py-6">
-      <!-- Report Info -->
+      <!-- Report Selector -->
       <div class="mb-6 bg-white/5 backdrop-blur-sm border border-white/10 rounded-xl p-4">
-        <div class="flex items-center gap-4">
-          <div class="text-4xl">{{ currentReport.icon }}</div>
-          <div>
-            <h3 class="text-white font-semibold text-lg">{{ currentReport.name }} отчёт</h3>
-            <p class="text-gray-400 text-sm">{{ currentReport.desc }}</p>
-          </div>
+        <h3 class="text-white font-semibold mb-3 flex items-center gap-2">
+          <span>📑</span> Выберите пример отчёта
+        </h3>
+        <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-3">
+          <button
+            v-for="(report, index) in reportExamples"
+            :key="index"
+            @click="selectedReport = index"
+            class="p-3 rounded-lg border transition-all text-left"
+            :class="selectedReport === index
+              ? 'bg-blue-500/20 border-blue-500/50 text-blue-300'
+              : 'bg-white/5 border-white/10 text-gray-300 hover:bg-white/10'"
+          >
+            <div class="text-2xl mb-1">{{ report.icon }}</div>
+            <div class="font-medium text-sm">{{ report.name }}</div>
+            <div class="text-xs opacity-70 mt-1">{{ report.desc }}</div>
+          </button>
         </div>
       </div>
 
