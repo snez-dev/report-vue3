@@ -89,7 +89,7 @@
 <script setup lang="ts">
 import { ref, computed, watch, onMounted, onUnmounted, nextTick, useSlots } from 'vue'
 import jsPDF from 'jspdf'
-import html2canvas from 'html2canvas'
+import { toPng } from 'html-to-image'
 
 // Props
 const props = withDefaults(defineProps<{
@@ -211,16 +211,19 @@ const exportPDF = async () => {
     for (let i = 0; i < pages.length; i++) {
       if (i > 0) pdf.addPage()
 
-      const canvas = await html2canvas(pages[i] as HTMLElement, {
-        scale: 2,
-        useCORS: true,
-        logging: false,
-        backgroundColor: '#ffffff'
+      const imgData = await toPng(pages[i] as HTMLElement, {
+        pixelRatio: 2,
+        backgroundColor: '#ffffff',
+        cacheBust: true,
       })
 
-      const imgData = canvas.toDataURL('image/png')
+      // Получаем размеры изображения для расчёта пропорций
+      const img = new Image()
+      img.src = imgData
+      await new Promise((resolve) => { img.onload = resolve })
+
       const imgWidth = width - props.margin * 2
-      const imgHeight = (canvas.height * imgWidth) / canvas.width
+      const imgHeight = (img.height * imgWidth) / img.width
 
       pdf.addImage(imgData, 'PNG', props.margin, props.margin, imgWidth, Math.min(imgHeight, height - props.margin * 2))
     }
