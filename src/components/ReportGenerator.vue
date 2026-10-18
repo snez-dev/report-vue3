@@ -26,11 +26,21 @@
     <div class="report-container" ref="reportContainer">
       <!-- Main Content Slot -->
       <div class="report-content" ref="reportContent">
+        <!-- Header Slot -->
+        <div class="report-header" v-if="$slots.header">
+          <slot name="header" :page="currentPage" :total-pages="totalPages" />
+        </div>
+        
         <slot :page="currentPage" :total-pages="totalPages">
           <p style="color: #999; text-align: center; padding: 40px;">
             Контент не предоставлен. Используйте slot для вставки содержимого.
           </p>
         </slot>
+        
+        <!-- Footer Slot -->
+        <div class="report-footer" v-if="$slots.footer">
+          <slot name="footer" :page="currentPage" :total-pages="totalPages" />
+        </div>
       </div>
     </div>
 
@@ -220,26 +230,7 @@ const exportPDF = async () => {
 
     // Проверяем наличие ручного деления на страницы
     const manualPages = contentEl.querySelectorAll('.report-page')
-    const totalPagesCount = manualPages.length > 0 ? manualPages.length : Math.ceil(contentEl.scrollHeight / (height * 3.78))
     
-    // Создаём временные элементы для header и footer
-    const headerEl = document.createElement('div')
-    const footerEl = document.createElement('div')
-    
-    if (slots.header) {
-      headerEl.innerHTML = '<div style="padding: 5mm 10mm; font-size: 10px; color: #666; border-bottom: 1px solid #ddd;">' + 
-        (typeof slots.header({ page: 0, totalPages: totalPagesCount }) === 'string' 
-          ? slots.header({ page: 0, totalPages: totalPagesCount }) 
-          : '') + '</div>'
-    }
-    
-    if (slots.footer) {
-      footerEl.innerHTML = '<div style="padding: 5mm 10mm; font-size: 10px; color: #666; border-top: 1px solid #ddd; text-align: center;">' + 
-        (typeof slots.footer({ page: 0, totalPages: totalPagesCount }) === 'string'
-          ? slots.footer({ page: 0, totalPages: totalPagesCount })
-          : '') + '</div>'
-    }
-
     if (manualPages.length > 0) {
       // Режим ручного деления - рендерим каждую страницу отдельно
       for (let i = 0; i < manualPages.length; i++) {
@@ -256,28 +247,7 @@ const exportPDF = async () => {
         const imgWidth = width - props.margin * 2
         const imgHeight = (canvas.height * imgWidth) / canvas.width
 
-        // Добавляем header
-        if (slots.header) {
-          pdf.setFontSize(9)
-          pdf.setTextColor(100)
-          pdf.text(`${props.title} - Страница ${i + 1} из ${manualPages.length}`, props.margin, 10)
-          pdf.setDrawColor(200)
-          pdf.line(props.margin, 12, width - props.margin, 12)
-        }
-
-        // Добавляем контент
-        const contentY = slots.header ? 15 : props.margin
-        const contentHeight = slots.header && slots.footer ? height - 30 : slots.header || slots.footer ? height - 20 : height - props.margin * 2
-        pdf.addImage(imgData, 'PNG', props.margin, contentY, imgWidth, Math.min(imgHeight, contentHeight))
-
-        // Добавляем footer
-        if (slots.footer) {
-          pdf.setDrawColor(200)
-          pdf.line(props.margin, height - 15, width - props.margin, height - 15)
-          pdf.setFontSize(9)
-          pdf.setTextColor(100)
-          pdf.text(`© ${new Date().getFullYear()} ${props.title}`, width / 2, height - 10, { align: 'center' })
-        }
+        pdf.addImage(imgData, 'PNG', props.margin, props.margin, imgWidth, Math.min(imgHeight, height - props.margin * 2))
       }
 
       pdf.save(`${props.title}.pdf`)
@@ -325,28 +295,7 @@ const exportPDF = async () => {
         const pageImgData = pageCanvas.toDataURL('image/png')
         const pageImgHeight = (pageCanvas.height * imgWidth) / pageCanvas.width
 
-        // Добавляем header
-        if (slots.header) {
-          pdf.setFontSize(9)
-          pdf.setTextColor(100)
-          pdf.text(`${props.title} - Страница ${i + 1} из ${totalPages}`, props.margin, 10)
-          pdf.setDrawColor(200)
-          pdf.line(props.margin, 12, width - props.margin, 12)
-        }
-
-        // Добавляем контент
-        const contentY = slots.header ? 15 : props.margin
-        const contentHeight = slots.header && slots.footer ? height - 30 : slots.header || slots.footer ? height - 20 : height - props.margin * 2
-        pdf.addImage(pageImgData, 'PNG', props.margin, contentY, imgWidth, Math.min(pageImgHeight, contentHeight))
-
-        // Добавляем footer
-        if (slots.footer) {
-          pdf.setDrawColor(200)
-          pdf.line(props.margin, height - 15, width - props.margin, height - 15)
-          pdf.setFontSize(9)
-          pdf.setTextColor(100)
-          pdf.text(`© ${new Date().getFullYear()} ${props.title}`, width / 2, height - 10, { align: 'center' })
-        }
+        pdf.addImage(pageImgData, 'PNG', props.margin, props.margin, imgWidth, pageImgHeight)
       }
 
       pdf.save(`${props.title}.pdf`)
@@ -587,6 +536,23 @@ defineExpose({
   padding: 0;
   margin: 0;
   width: 100%;
+}
+
+.report-header {
+  padding: 10px 20px;
+  background: #f8fafc;
+  border-bottom: 1px solid #e5e7eb;
+  font-size: 12px;
+  color: #6b7280;
+}
+
+.report-footer {
+  padding: 10px 20px;
+  background: #f8fafc;
+  border-top: 1px solid #e5e7eb;
+  text-align: center;
+  font-size: 12px;
+  color: #6b7280;
 }
 
 :deep(.report-page) {
