@@ -186,6 +186,32 @@ const generatePDFBlob = async (): Promise<Blob> => {
   // Проверяем наличие ручного деления на страницы
   const manualPages = contentEl.querySelectorAll('.report-page')
   
+  // Получаем колонтитулы
+  const headerEl = contentEl.querySelector('.report-header')
+  const footerEl = contentEl.querySelector('.report-footer')
+  
+  // Рендерим колонтитулы если они есть
+  let headerCanvas: HTMLCanvasElement | null = null
+  let footerCanvas: HTMLCanvasElement | null = null
+  
+  if (headerEl) {
+    headerCanvas = await html2canvas(headerEl as HTMLElement, {
+      scale: 2,
+      useCORS: true,
+      logging: false,
+      backgroundColor: '#ffffff'
+    })
+  }
+  
+  if (footerEl) {
+    footerCanvas = await html2canvas(footerEl as HTMLElement, {
+      scale: 2,
+      useCORS: true,
+      logging: false,
+      backgroundColor: '#ffffff'
+    })
+  }
+  
   if (manualPages.length > 0) {
     // Режим ручного деления - рендерим каждую страницу отдельно
     for (let i = 0; i < manualPages.length; i++) {
@@ -206,30 +232,62 @@ const generatePDFBlob = async (): Promise<Blob> => {
     }
   } else {
     // Режим автоматической пагинации - рендерим весь контент и разбиваем
-    const canvas = await html2canvas(contentEl, {
+    // Исключаем колонтитулы из основного контента для рендеринга
+    const mainContent = contentEl.cloneNode(true) as HTMLElement
+    const headerInClone = mainContent.querySelector('.report-header')
+    const footerInClone = mainContent.querySelector('.report-footer')
+    
+    if (headerInClone) headerInClone.remove()
+    if (footerInClone) footerInClone.remove()
+    
+    // Создаём временный контейнер для рендеринга
+    const tempContainer = document.createElement('div')
+    tempContainer.style.position = 'absolute'
+    tempContainer.style.left = '-9999px'
+    tempContainer.style.top = '0'
+    tempContainer.appendChild(mainContent)
+    document.body.appendChild(tempContainer)
+    
+    const canvas = await html2canvas(mainContent, {
       scale: 2,
       useCORS: true,
       logging: false,
       backgroundColor: '#ffffff'
     })
+    
+    document.body.removeChild(tempContainer)
 
     const imgData = canvas.toDataURL('image/png')
     
     // Рассчитываем размеры
     const imgWidth = width - props.margin * 2
     
-    // Высота одной страницы в пикселях (с учётом scale)
-    const pageHeightPx = (height - props.margin * 2) * (canvas.width / width)
-    const totalPagesCount = Math.ceil(canvas.height / pageHeightPx)
+    // Высота колонтитулов в мм
+    const headerHeightMm = headerCanvas ? (headerCanvas.height / headerCanvas.width) * imgWidth : 0
+    const footerHeightMm = footerCanvas ? (footerCanvas.height / footerCanvas.width) * imgWidth : 0
+    
+    // Высота доступной области для контента
+    const contentHeightMm = height - props.margin * 2 - headerHeightMm - footerHeightMm
+    const contentHeightPx = contentHeightMm * (canvas.width / width)
+    
+    const totalPagesCount = Math.ceil(canvas.height / contentHeightPx)
 
     // Добавляем страницы в PDF
     for (let i = 0; i < totalPagesCount; i++) {
       if (i > 0) pdf.addPage()
 
-      // Создаём canvas для одной страницы
+      // Добавляем header если есть
+      if (headerCanvas) {
+        const headerImgData = headerCanvas.toDataURL('image/png')
+        const headerImgWidth = width - props.margin * 2
+        const headerImgHeight = (headerCanvas.height * headerImgWidth) / headerCanvas.width
+        pdf.addImage(headerImgData, 'PNG', props.margin, props.margin, headerImgWidth, headerImgHeight)
+      }
+
+      // Создаём canvas для одной страницы контента
       const pageCanvas = document.createElement('canvas')
       pageCanvas.width = canvas.width
-      pageCanvas.height = Math.min(pageHeightPx, canvas.height - i * pageHeightPx)
+      pageCanvas.height = Math.min(contentHeightPx, canvas.height - i * contentHeightPx)
       
       const ctx = pageCanvas.getContext('2d')!
       ctx.fillStyle = '#ffffff'
@@ -238,7 +296,7 @@ const generatePDFBlob = async (): Promise<Blob> => {
       // Копируем часть изображения
       ctx.drawImage(
         canvas,
-        0, i * pageHeightPx,
+        0, i * contentHeightPx,
         canvas.width, pageCanvas.height,
         0, 0,
         pageCanvas.width, pageCanvas.height
@@ -246,8 +304,20 @@ const generatePDFBlob = async (): Promise<Blob> => {
 
       const pageImgData = pageCanvas.toDataURL('image/png')
       const pageImgHeight = (pageCanvas.height * imgWidth) / pageCanvas.width
+      
+      // Позиция контента (после header)
+      const contentY = props.margin + headerHeightMm
 
-      pdf.addImage(pageImgData, 'PNG', props.margin, props.margin, imgWidth, pageImgHeight)
+      pdf.addImage(pageImgData, 'PNG', props.margin, contentY, imgWidth, pageImgHeight)
+
+      // Добавляем footer если есть
+      if (footerCanvas) {
+        const footerImgData = footerCanvas.toDataURL('image/png')
+        const footerImgWidth = width - props.margin * 2
+        const footerImgHeight = (footerCanvas.height * footerImgWidth) / footerCanvas.width
+        const footerY = height - props.margin - footerImgHeight
+        pdf.addImage(footerImgData, 'PNG', props.margin, footerY, footerImgWidth, footerImgHeight)
+      }
     }
   }
 
@@ -623,6 +693,38 @@ defineExpose({
 
 :deep(.report-page:hover) {
   box-shadow: 0 4px 20px rgba(0, 0, 0, 0.1);
+}
+
+/* Предотвращение разрыва элементов при печати */
+:deep(.report-page table) {
+  break-inside: auto;
+}
+
+:deep(.report-page tr) {
+  break-inside: avoid;
+  break-after: auto;
+  page-break-inside: avoid;
+}
+
+:deep(.report-page thead) {
+  display: table-header-group;
+}
+
+:deep(.report-page tfoot) {
+  display: table-footer-group;
+}
+
+:deep(.report-page h1),
+:deep(.report-page h2),
+:deep(.report-page h3),
+:deep(.report-page h4) {
+  break-after: avoid;
+  page-break-after: avoid;
+}
+
+:deep(.report-page .no-break) {
+  break-inside: avoid;
+  page-break-inside: avoid;
 }
 
 

@@ -22,7 +22,7 @@ const avgSalary = Math.round(employees.reduce((sum, e) => sum + e.salary, 0) / e
 </script>
 
 <template>
-  <div style="padding: 20px;">
+  <div>
     <h1 style="text-align: center; color: #1f2937; margin-bottom: 10px;">Список сотрудников</h1>
     <p style="text-align: center; color: #6b7280; margin-bottom: 30px;">ООО "Компания" • {{ new Date().toLocaleDateString('ru-RU') }}</p>
 

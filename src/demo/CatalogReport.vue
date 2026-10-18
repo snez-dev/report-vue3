@@ -13,7 +13,7 @@ const totalStock = products.reduce((sum, p) => sum + p.stock, 0)
 </script>
 
 <template>
-  <div style="padding: 20px;">
+  <div>
     <h1 style="text-align: center; color: #1f2937; margin-bottom: 10px;">Каталог товаров</h1>
     <p style="text-align: center; color: #6b7280; margin-bottom: 30px;">ООО "ТехноМаркет" • {{ new Date().toLocaleDateString('ru-RU') }}</p>
 

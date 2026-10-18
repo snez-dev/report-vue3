@@ -21,6 +21,39 @@
   column-gap: 8mm;
 }
 
+/* Предотвращение разрыва элементов */
+.report-page table {
+  break-inside: auto;
+}
+
+.report-page tr {
+  break-inside: avoid;
+  break-after: auto;
+}
+
+.report-page thead {
+  display: table-header-group;
+}
+
+.report-page tfoot {
+  display: table-footer-group;
+}
+
+/* Предотвращение разрыва заголовков */
+.report-page h1,
+.report-page h2,
+.report-page h3,
+.report-page h4 {
+  break-after: avoid;
+  page-break-after: avoid;
+}
+
+/* Предотвращение разрыва блоков */
+.report-page .no-break {
+  break-inside: avoid;
+  page-break-inside: avoid;
+}
+
 /* Заголовки */
 
 /* Заголовки */

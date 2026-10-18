@@ -32,7 +32,7 @@ const stats = {
 </script>
 
 <template>
-  <div style="padding: 20px;">
+  <div>
     <h1 style="text-align: center; color: #1f2937; margin-bottom: 10px;">Системные логи</h1>
     <p style="text-align: center; color: #6b7280; margin-bottom: 30px;">Отчёт за последние 24 часа</p>
 

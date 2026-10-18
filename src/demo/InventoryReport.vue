@@ -19,7 +19,7 @@ const lowStockItems = items.filter(item => item.quantity < item.minStock)
 </script>
 
 <template>
-  <div style="padding: 20px;">
+  <div>
     <h1 style="text-align: center; color: #1f2937; margin-bottom: 10px;">Инвентаризация склада</h1>
     <p style="text-align: center; color: #6b7280; margin-bottom: 30px;">{{ new Date().toLocaleDateString('ru-RU') }}</p>
 
