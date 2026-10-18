@@ -54,6 +54,15 @@
   page-break-inside: avoid;
 }
 
+/* Повторение заголовков таблиц */
+.report-page table.repeat-header thead {
+  display: table-header-group;
+}
+
+.report-page table.repeat-header tfoot {
+  display: table-footer-group;
+}
+
 /* Заголовки */
 
 /* Заголовки */

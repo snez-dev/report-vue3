@@ -6,6 +6,7 @@ import { reportExamples } from './demo'
 const selectedReport = ref(0)
 const showCode = ref(false)
 const copied = ref(false)
+const repeatTableHeaders = ref(false)
 const toast = ref<{ icon: string; title: string; message: string } | null>(null)
 
 const currentDate = new Date().toLocaleDateString('ru-RU')
@@ -117,28 +118,39 @@ const data = ref([
     </header>
 
     <div class="max-w-7xl mx-auto px-4 py-6">
-      <!-- Report Selector -->
-      <div class="mb-6 bg-white/5 backdrop-blur-sm border border-white/10 rounded-xl p-4">
-        <h3 class="text-white font-semibold mb-3 flex items-center gap-2">
-          <span>📑</span> Выберите пример отчёта
-        </h3>
-        <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-3">
-          <button
-            v-for="(report, index) in reportExamples"
-            :key="index"
-            @click="selectedReport = index"
-            class="p-3 rounded-lg border transition-all text-left"
-            :class="selectedReport === index
-              ? 'bg-blue-500/20 border-blue-500/50 text-blue-300'
-              : 'bg-white/5 border-white/10 text-gray-300 hover:bg-white/10'"
-          >
-            <div class="text-2xl mb-1">{{ report.icon }}</div>
-            <div class="font-medium text-sm">{{ report.name }}</div>
-            <div class="text-xs opacity-70 mt-1">{{ report.desc }}</div>
-          </button>
-        </div>
-      </div>
-
+          <!-- Report Selector -->
+          <div class="mb-6 bg-white/5 backdrop-blur-sm border border-white/10 rounded-xl p-4">
+            <h3 class="text-white font-semibold mb-3 flex items-center gap-2">
+              <span>📑</span> Выберите пример отчёта
+            </h3>
+            <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-3">
+              <button
+                v-for="(report, index) in reportExamples"
+                :key="index"
+                @click="selectedReport = index"
+                class="p-3 rounded-lg border transition-all text-left"
+                :class="selectedReport === index
+                  ? 'bg-blue-500/20 border-blue-500/50 text-blue-300'
+                  : 'bg-white/5 border-white/10 text-gray-300 hover:bg-white/10'"
+              >
+                <div class="text-2xl mb-1">{{ report.icon }}</div>
+                <div class="font-medium text-sm">{{ report.name }}</div>
+                <div class="text-xs opacity-70 mt-1">{{ report.desc }}</div>
+              </button>
+            </div>
+            
+            <!-- Repeat Table Headers Toggle -->
+            <div class="mt-4 pt-4 border-t border-white/10">
+              <label class="flex items-center gap-3 cursor-pointer">
+                <input
+                  type="checkbox"
+                  v-model="repeatTableHeaders"
+                  class="w-4 h-4 rounded border-gray-600 bg-gray-700 text-blue-500 focus:ring-blue-500 focus:ring-offset-gray-800"
+                />
+                <span class="text-white text-sm">Повторять заголовки таблиц на каждой странице</span>
+              </label>
+            </div>
+          </div>
       <div class="grid grid-cols-1 lg:grid-cols-4 gap-6">
         <!-- Left Panel -->
         <div class="lg:col-span-1 space-y-4">
@@ -209,6 +221,7 @@ const data = ref([
             :page-size="currentReport.format"
             orientation="portrait"
             :margin="15"
+            :repeat-table-headers="repeatTableHeaders"
             @export-start="onExportStart"
             @export-end="onExportEnd"
           >

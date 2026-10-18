@@ -104,13 +104,15 @@ const props = withDefaults(defineProps<{
   margin?: number
   darkMode?: boolean
   autoPagination?: boolean
+  repeatTableHeaders?: boolean
 }>(), {
   title: 'Отчёт',
   pageSize: 'a4',
   orientation: 'portrait',
   margin: 20,
   darkMode: false,
-  autoPagination: true
+  autoPagination: true,
+  repeatTableHeaders: false
 })
 
 // Emits
@@ -240,13 +242,45 @@ const generatePDFBlob = async (): Promise<Blob> => {
     if (headerInClone) headerInClone.remove()
     if (footerInClone) footerInClone.remove()
     
+    // Если включено повторение заголовков таблиц, добавляем класс для CSS
+    if (props.repeatTableHeaders) {
+      const tables = mainContent.querySelectorAll('table')
+      tables.forEach(table => {
+        table.classList.add('repeat-header')
+      })
+    }
+    
     // Создаём временный контейнер для рендеринга
     const tempContainer = document.createElement('div')
     tempContainer.style.position = 'absolute'
     tempContainer.style.left = '-9999px'
     tempContainer.style.top = '0'
+    tempContainer.style.width = `${width * 3.78}px` // мм в пиксели
     tempContainer.appendChild(mainContent)
     document.body.appendChild(tempContainer)
+    
+    // Если включено повторение заголовков, дублируем thead для каждой страницы
+    if (props.repeatTableHeaders) {
+      const tables = mainContent.querySelectorAll('table.repeat-header')
+      tables.forEach(table => {
+        const thead = table.querySelector('thead')
+        if (thead) {
+          // Клонируем thead
+          const theadClone = thead.cloneNode(true) as HTMLElement
+          
+          // Находим все строки таблицы
+          const rows = Array.from(table.querySelectorAll('tbody tr'))
+          const rowsPerPage = Math.floor(30 / rows.length * 10) // Примерное количество строк на страницу
+          
+          // Вставляем копии thead каждые N строк
+          for (let i = rowsPerPage; i < rows.length; i += rowsPerPage) {
+            const newRow = document.createElement('tr')
+            newRow.innerHTML = `<td colspan="${thead.querySelectorAll('th').length}" style="padding: 0;"></td>`
+            rows[i].parentNode?.insertBefore(theadClone.cloneNode(true), rows[i])
+          }
+        }
+      })
+    }
     
     const canvas = await html2canvas(mainContent, {
       scale: 2,
@@ -725,6 +759,15 @@ defineExpose({
 :deep(.report-page .no-break) {
   break-inside: avoid;
   page-break-inside: avoid;
+}
+
+/* Повторение заголовков таблиц */
+:deep(.report-page table.repeat-header thead) {
+  display: table-header-group;
+}
+
+:deep(.report-page table.repeat-header tfoot) {
+  display: table-footer-group;
 }
 
 
