@@ -250,36 +250,95 @@ const generatePDFBlob = async (): Promise<Blob> => {
       pdf.addImage(imgData, 'PNG', props.margin, props.margin, imgWidth, Math.min(imgHeight, height - props.margin * 2))
     }
   } else {
-    // Auto pagination - render entire content with headers/footers
+    // Auto pagination - render content with headers/footers on each page
+    const headerEl = contentEl.querySelector('.report-header')
+    const footerEl = contentEl.querySelector('.report-footer')
+    
+    // Get main content without header/footer
+    const mainContent = contentEl.cloneNode(true) as HTMLElement
+    const headerInClone = mainContent.querySelector('.report-header')
+    const footerInClone = mainContent.querySelector('.report-footer')
+    if (headerInClone) headerInClone.remove()
+    if (footerInClone) footerInClone.remove()
+    
+    // Render header if exists
+    let headerCanvas: HTMLCanvasElement | null = null
+    if (headerEl) {
+      const headerClone = headerEl.cloneNode(true) as HTMLElement
+      const tempHeader = document.createElement('div')
+      tempHeader.style.cssText = 'position:absolute;left:-9999px;top:0;background:white;'
+      tempHeader.style.width = `${width * 3.78}px`
+      tempHeader.appendChild(headerClone)
+      document.body.appendChild(tempHeader)
+      headerCanvas = await renderElementToCanvas(tempHeader)
+      document.body.removeChild(tempHeader)
+    }
+    
+    // Render footer if exists
+    let footerCanvas: HTMLCanvasElement | null = null
+    if (footerEl) {
+      const footerClone = footerEl.cloneNode(true) as HTMLElement
+      const tempFooter = document.createElement('div')
+      tempFooter.style.cssText = 'position:absolute;left:-9999px;top:0;background:white;'
+      tempFooter.style.width = `${width * 3.78}px`
+      tempFooter.appendChild(footerClone)
+      document.body.appendChild(tempFooter)
+      footerCanvas = await renderElementToCanvas(tempFooter)
+      document.body.removeChild(tempFooter)
+    }
+    
+    // Render main content
     const tempContainer = document.createElement('div')
     tempContainer.style.cssText = 'position:absolute;left:-9999px;top:0;background:white;'
     tempContainer.style.width = `${width * 3.78}px`
-    
-    const mainContent = contentEl.cloneNode(true) as HTMLElement
     tempContainer.appendChild(mainContent)
     document.body.appendChild(tempContainer)
 
-    const canvas = await renderElementToCanvas(mainContent)
+    const contentCanvas = await renderElementToCanvas(mainContent)
     document.body.removeChild(tempContainer)
 
-    const contentHeightPx = (height - props.margin * 2) * (canvas.width / width)
-    const totalPagesCount = Math.ceil(canvas.height / contentHeightPx)
+    // Calculate dimensions
+    const headerHeightPx = headerCanvas ? headerCanvas.height : 0
+    const footerHeightPx = footerCanvas ? footerCanvas.height : 0
+    const availableHeightPx = ((height - props.margin * 2) * (contentCanvas.width / width)) - headerHeightPx - footerHeightPx
+    const totalPagesCount = Math.ceil(contentCanvas.height / availableHeightPx)
 
+    // Render each page with header and footer
     for (let i = 0; i < totalPagesCount; i++) {
       if (i > 0) pdf.addPage()
 
+      // Add header if exists
+      if (headerCanvas) {
+        const headerImgData = headerCanvas.toDataURL('image/png')
+        const headerImgWidth = imgWidth
+        const headerImgHeight = (headerCanvas.height * headerImgWidth) / headerCanvas.width
+        pdf.addImage(headerImgData, 'PNG', props.margin, props.margin, headerImgWidth, headerImgHeight)
+      }
+
+      // Create canvas for content page
       const pageCanvas = document.createElement('canvas')
-      pageCanvas.width = canvas.width
-      pageCanvas.height = Math.min(contentHeightPx, canvas.height - i * contentHeightPx)
+      pageCanvas.width = contentCanvas.width
+      pageCanvas.height = Math.min(availableHeightPx, contentCanvas.height - i * availableHeightPx)
       
       const ctx = pageCanvas.getContext('2d')!
       ctx.fillStyle = '#ffffff'
       ctx.fillRect(0, 0, pageCanvas.width, pageCanvas.height)
-      ctx.drawImage(canvas, 0, i * contentHeightPx, canvas.width, pageCanvas.height, 0, 0, pageCanvas.width, pageCanvas.height)
+      ctx.drawImage(contentCanvas, 0, i * availableHeightPx, contentCanvas.width, pageCanvas.height, 0, 0, pageCanvas.width, pageCanvas.height)
 
       const pageImgData = pageCanvas.toDataURL('image/png')
       const pageImgHeight = (pageCanvas.height * imgWidth) / pageCanvas.width
-      pdf.addImage(pageImgData, 'PNG', props.margin, props.margin, imgWidth, pageImgHeight)
+      const contentY = props.margin + (headerCanvas ? (headerCanvas.height * imgWidth) / headerCanvas.width : 0)
+      
+      pdf.addImage(pageImgData, 'PNG', props.margin, contentY, imgWidth, pageImgHeight)
+
+      // Add footer if exists
+      if (footerCanvas) {
+        const footerImgData = footerCanvas.toDataURL('image/png')
+        const footerImgWidth = imgWidth
+        const footerImgHeight = (footerCanvas.height * footerImgWidth) / footerCanvas.width
+        const footerY = height - props.margin - footerImgHeight
+        pdf.addImage(footerImgData, 'PNG', props.margin, footerY, footerImgWidth, footerImgHeight)
+      }
     }
   }
 

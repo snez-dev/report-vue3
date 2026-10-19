@@ -80,9 +80,26 @@ import ReportGenerator from './components/ReportGenerator.vue'
 | `title` | `string` | `'Отчёт'` | Название документа |
 | `pageSize` | `'a4' \| 'letter' \| 'legal'` | `'a4'` | Формат страницы |
 | `orientation` | `'portrait' \| 'landscape'` | `'portrait'` | Ориентация |
-| `margin` | `number` | `20` | Поля (мм) |
+| `margin` | `number` | `20` | Поля страницы (мм) |
 | `repeatTableHeaders` | `boolean` | `false` | Повторять заголовки таблиц |
 | `autoPagination` | `boolean` | `true` | Автопагинация |
+
+### Настройка полей страницы
+
+В интерфейсе добавлен слайдер для динамического изменения полей страницы от 5 до 40 мм:
+
+```vue
+<ReportGenerator :margin="15">
+  <!-- контент -->
+</ReportGenerator>
+```
+
+**Диапазон значений:**
+- Минимум: 5 мм
+- Максимум: 40 мм
+- Шаг: 1 мм
+
+Поля применяются ко всем сторонам страницы (верх, низ, лево, право).
 
 ### События
 

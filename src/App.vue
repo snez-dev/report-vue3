@@ -7,6 +7,7 @@ const selectedReport = ref(0)
 const showCode = ref(false)
 const copied = ref(false)
 const repeatTableHeaders = ref(false)
+const margin = ref(15)
 const toast = ref<{ icon: string; title: string; message: string } | null>(null)
 
 const currentDate = new Date().toLocaleDateString('ru-RU')
@@ -210,6 +211,25 @@ const data = ref([
               <div class="flex justify-between text-gray-300"><code class="text-blue-300">margin</code><span class="text-gray-500">Number (mm)</span></div>
               <div class="flex justify-between text-gray-300"><code class="text-blue-300">darkMode</code><span class="text-gray-500">Boolean</span></div>
             </div>
+            
+            <!-- Margin Control -->
+            <div class="mt-4 pt-4 border-t border-white/10">
+              <label class="block text-white text-sm mb-2">
+                Поля страницы: <span class="text-blue-300 font-semibold">{{ margin }} мм</span>
+              </label>
+              <input
+                type="range"
+                v-model.number="margin"
+                min="5"
+                max="40"
+                step="1"
+                class="w-full h-2 bg-gray-700 rounded-lg appearance-none cursor-pointer accent-blue-500"
+              />
+              <div class="flex justify-between text-xs text-gray-500 mt-1">
+                <span>5 мм</span>
+                <span>40 мм</span>
+              </div>
+            </div>
           </div>
         </div>
 
@@ -220,7 +240,7 @@ const data = ref([
             :title="currentReport.title"
             :page-size="currentReport.format"
             orientation="portrait"
-            :margin="15"
+            :margin="margin"
             :repeat-table-headers="repeatTableHeaders"
             @export-start="onExportStart"
             @export-end="onExportEnd"
