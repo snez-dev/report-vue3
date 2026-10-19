@@ -22,29 +22,29 @@
       </div>
     </div>
 
-    <!-- Report Content Area -->
+    <!-- Report Content -->
     <div class="report-container" ref="reportContainer">
-      <!-- Main Content Slot -->
       <div class="report-content" ref="reportContent">
-        <!-- Header Slot -->
-        <div class="report-header" v-if="$slots.header">
+        <!-- Header -->
+        <div v-if="$slots.header" class="report-header">
           <slot name="header" :page="currentPage" :total-pages="totalPages" />
         </div>
         
+        <!-- Main Content -->
         <slot :page="currentPage" :total-pages="totalPages">
           <p style="color: #999; text-align: center; padding: 40px;">
             Контент не предоставлен. Используйте slot для вставки содержимого.
           </p>
         </slot>
         
-        <!-- Footer Slot -->
-        <div class="report-footer" v-if="$slots.footer">
+        <!-- Footer -->
+        <div v-if="$slots.footer" class="report-footer">
           <slot name="footer" :page="currentPage" :total-pages="totalPages" />
         </div>
       </div>
     </div>
 
-    <!-- Preview Overlay -->
+    <!-- Preview Modal -->
     <Teleport to="body">
       <Transition name="fade">
         <div v-if="showPreview" class="preview-overlay" @click.self="closePreview">
@@ -92,7 +92,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed, watch, onMounted, onUnmounted, nextTick, useSlots } from 'vue'
+import { ref, computed, watch, onMounted, onUnmounted, nextTick } from 'vue'
 import jsPDF from 'jspdf'
 import html2canvas from 'html2canvas'
 
@@ -118,7 +118,7 @@ const props = withDefaults(defineProps<{
 // Emits
 const emit = defineEmits<{
   'export-start': []
-  'export-end': [data: { format: string; pages?: number }]
+  'export-end': [{ format: string; pages?: number }]
   'page-change': [page: number]
   'error': [error: Error]
 }>()
@@ -126,7 +126,6 @@ const emit = defineEmits<{
 // Refs
 const reportContainer = ref<HTMLElement | null>(null)
 const reportContent = ref<HTMLElement | null>(null)
-const slots = useSlots()
 
 // State
 const currentPage = ref(0)
@@ -134,8 +133,6 @@ const showPreview = ref(false)
 const isExporting = ref(false)
 const isGeneratingPreview = ref(false)
 const totalPages = ref(1)
-const pageHTML = ref<string[]>([])
-const pageElements = ref<HTMLElement[]>([])
 const previewUrl = ref<string | null>(null)
 
 // Computed
@@ -146,10 +143,9 @@ const pageDimensions = computed(() => {
     legal: { width: 216, height: 356 }
   }
   const size = sizes[props.pageSize]
-  if (props.orientation === 'landscape') {
-    return { width: size.height, height: size.width }
-  }
-  return size
+  return props.orientation === 'landscape' 
+    ? { width: size.height, height: size.width }
+    : size
 })
 
 // Methods
@@ -158,18 +154,48 @@ const calculatePages = async () => {
   await nextTick()
   
   const pages = reportContent.value.querySelectorAll('.report-page')
-  
-  // Если есть ручное деление на страницы
   if (pages.length > 0) {
-    pageElements.value = Array.from(pages) as HTMLElement[]
     totalPages.value = pages.length
   } else {
-    // Автоматический подсчёт страниц по высоте контента
     const contentHeight = reportContent.value.scrollHeight
-    const pageHeight = pageDimensions.value.height * 3.78 // мм в пиксели (примерно)
+    const pageHeight = pageDimensions.value.height * 3.78
     totalPages.value = Math.max(1, Math.ceil(contentHeight / pageHeight))
-    pageElements.value = []
   }
+}
+
+const scrollToPage = (pageIndex: number) => {
+  const pages = reportContent.value?.querySelectorAll('.report-page')
+  if (pages && pages.length > 0 && pages[pageIndex]) {
+    (pages[pageIndex] as HTMLElement).scrollIntoView({ behavior: 'smooth', block: 'start' })
+  } else if (reportContent.value) {
+    const pageHeight = pageDimensions.value.height * 3.78
+    reportContent.value.scrollTo({ top: pageIndex * pageHeight, behavior: 'smooth' })
+  }
+}
+
+const prevPage = () => {
+  if (currentPage.value > 0) {
+    currentPage.value--
+    scrollToPage(currentPage.value)
+    emit('page-change', currentPage.value)
+  }
+}
+
+const nextPage = () => {
+  if (currentPage.value < totalPages.value - 1) {
+    currentPage.value++
+    scrollToPage(currentPage.value)
+    emit('page-change', currentPage.value)
+  }
+}
+
+const renderElementToCanvas = async (element: HTMLElement): Promise<HTMLCanvasElement> => {
+  return await html2canvas(element, {
+    scale: 2,
+    useCORS: true,
+    logging: false,
+    backgroundColor: '#ffffff'
+  })
 }
 
 const generatePDFBlob = async (): Promise<Blob> => {
@@ -181,144 +207,67 @@ const generatePDFBlob = async (): Promise<Blob> => {
   })
 
   const contentEl = reportContent.value
-  if (!contentEl) {
-    throw new Error('Нет контента для экспорта')
-  }
+  if (!contentEl) throw new Error('Нет контента для экспорта')
 
-  // Проверяем наличие ручного деления на страницы
   const manualPages = contentEl.querySelectorAll('.report-page')
-  
-  // Получаем колонтитулы
-  const headerEl = contentEl.querySelector('.report-header')
-  const footerEl = contentEl.querySelector('.report-footer')
-  
-  // Рендерим колонтитулы если они есть
-  let headerCanvas: HTMLCanvasElement | null = null
-  let footerCanvas: HTMLCanvasElement | null = null
-  
-  if (headerEl) {
-    headerCanvas = await html2canvas(headerEl as HTMLElement, {
-      scale: 2,
-      useCORS: true,
-      logging: false,
-      backgroundColor: '#ffffff'
-    })
-  }
-  
-  if (footerEl) {
-    footerCanvas = await html2canvas(footerEl as HTMLElement, {
-      scale: 2,
-      useCORS: true,
-      logging: false,
-      backgroundColor: '#ffffff'
-    })
-  }
-  
+  const imgWidth = width - props.margin * 2
+
   if (manualPages.length > 0) {
-    // Режим ручного деления - рендерим каждую страницу отдельно
+    // Manual pagination - render each page with headers/footers
     for (let i = 0; i < manualPages.length; i++) {
       if (i > 0) pdf.addPage()
-
-      const canvas = await html2canvas(manualPages[i] as HTMLElement, {
-        scale: 2,
-        useCORS: true,
-        logging: false,
-        backgroundColor: '#ffffff'
-      })
-
+      
+      // Create temporary container for this page with header and footer
+      const tempPage = document.createElement('div')
+      tempPage.style.cssText = 'position:absolute;left:-9999px;top:0;background:white;'
+      tempPage.style.width = `${width * 3.78}px`
+      
+      // Add header if exists
+      const headerEl = contentEl.querySelector('.report-header')
+      if (headerEl) {
+        const headerClone = headerEl.cloneNode(true) as HTMLElement
+        tempPage.appendChild(headerClone)
+      }
+      
+      // Add page content
+      const pageClone = manualPages[i].cloneNode(true) as HTMLElement
+      tempPage.appendChild(pageClone)
+      
+      // Add footer if exists
+      const footerEl = contentEl.querySelector('.report-footer')
+      if (footerEl) {
+        const footerClone = footerEl.cloneNode(true) as HTMLElement
+        tempPage.appendChild(footerClone)
+      }
+      
+      document.body.appendChild(tempPage)
+      
+      const canvas = await renderElementToCanvas(tempPage)
+      document.body.removeChild(tempPage)
+      
       const imgData = canvas.toDataURL('image/png')
-      const imgWidth = width - props.margin * 2
       const imgHeight = (canvas.height * imgWidth) / canvas.width
-
       pdf.addImage(imgData, 'PNG', props.margin, props.margin, imgWidth, Math.min(imgHeight, height - props.margin * 2))
     }
   } else {
-    // Режим автоматической пагинации - рендерим весь контент и разбиваем
-    // Исключаем колонтитулы из основного контента для рендеринга
-    const mainContent = contentEl.cloneNode(true) as HTMLElement
-    const headerInClone = mainContent.querySelector('.report-header')
-    const footerInClone = mainContent.querySelector('.report-footer')
-    
-    if (headerInClone) headerInClone.remove()
-    if (footerInClone) footerInClone.remove()
-    
-    // Если включено повторение заголовков таблиц, добавляем класс для CSS
-    if (props.repeatTableHeaders) {
-      const tables = mainContent.querySelectorAll('table')
-      tables.forEach(table => {
-        table.classList.add('repeat-header')
-      })
-    }
-    
-    // Создаём временный контейнер для рендеринга
+    // Auto pagination - render entire content with headers/footers
     const tempContainer = document.createElement('div')
-    tempContainer.style.position = 'absolute'
-    tempContainer.style.left = '-9999px'
-    tempContainer.style.top = '0'
-    tempContainer.style.width = `${width * 3.78}px` // мм в пиксели
+    tempContainer.style.cssText = 'position:absolute;left:-9999px;top:0;background:white;'
+    tempContainer.style.width = `${width * 3.78}px`
+    
+    const mainContent = contentEl.cloneNode(true) as HTMLElement
     tempContainer.appendChild(mainContent)
     document.body.appendChild(tempContainer)
-    
-    // Если включено повторение заголовков, дублируем thead для каждой страницы
-    if (props.repeatTableHeaders) {
-      const tables = mainContent.querySelectorAll('table.repeat-header')
-      tables.forEach(table => {
-        const thead = table.querySelector('thead')
-        if (thead) {
-          // Клонируем thead
-          const theadClone = thead.cloneNode(true) as HTMLElement
-          
-          // Находим все строки таблицы
-          const rows = Array.from(table.querySelectorAll('tbody tr'))
-          const rowsPerPage = Math.floor(30 / rows.length * 10) // Примерное количество строк на страницу
-          
-          // Вставляем копии thead каждые N строк
-          for (let i = rowsPerPage; i < rows.length; i += rowsPerPage) {
-            const newRow = document.createElement('tr')
-            newRow.innerHTML = `<td colspan="${thead.querySelectorAll('th').length}" style="padding: 0;"></td>`
-            rows[i].parentNode?.insertBefore(theadClone.cloneNode(true), rows[i])
-          }
-        }
-      })
-    }
-    
-    const canvas = await html2canvas(mainContent, {
-      scale: 2,
-      useCORS: true,
-      logging: false,
-      backgroundColor: '#ffffff'
-    })
-    
+
+    const canvas = await renderElementToCanvas(mainContent)
     document.body.removeChild(tempContainer)
 
-    const imgData = canvas.toDataURL('image/png')
-    
-    // Рассчитываем размеры
-    const imgWidth = width - props.margin * 2
-    
-    // Высота колонтитулов в мм
-    const headerHeightMm = headerCanvas ? (headerCanvas.height / headerCanvas.width) * imgWidth : 0
-    const footerHeightMm = footerCanvas ? (footerCanvas.height / footerCanvas.width) * imgWidth : 0
-    
-    // Высота доступной области для контента
-    const contentHeightMm = height - props.margin * 2 - headerHeightMm - footerHeightMm
-    const contentHeightPx = contentHeightMm * (canvas.width / width)
-    
+    const contentHeightPx = (height - props.margin * 2) * (canvas.width / width)
     const totalPagesCount = Math.ceil(canvas.height / contentHeightPx)
 
-    // Добавляем страницы в PDF
     for (let i = 0; i < totalPagesCount; i++) {
       if (i > 0) pdf.addPage()
 
-      // Добавляем header если есть
-      if (headerCanvas) {
-        const headerImgData = headerCanvas.toDataURL('image/png')
-        const headerImgWidth = width - props.margin * 2
-        const headerImgHeight = (headerCanvas.height * headerImgWidth) / headerCanvas.width
-        pdf.addImage(headerImgData, 'PNG', props.margin, props.margin, headerImgWidth, headerImgHeight)
-      }
-
-      // Создаём canvas для одной страницы контента
       const pageCanvas = document.createElement('canvas')
       pageCanvas.width = canvas.width
       pageCanvas.height = Math.min(contentHeightPx, canvas.height - i * contentHeightPx)
@@ -326,36 +275,84 @@ const generatePDFBlob = async (): Promise<Blob> => {
       const ctx = pageCanvas.getContext('2d')!
       ctx.fillStyle = '#ffffff'
       ctx.fillRect(0, 0, pageCanvas.width, pageCanvas.height)
-      
-      // Копируем часть изображения
-      ctx.drawImage(
-        canvas,
-        0, i * contentHeightPx,
-        canvas.width, pageCanvas.height,
-        0, 0,
-        pageCanvas.width, pageCanvas.height
-      )
+      ctx.drawImage(canvas, 0, i * contentHeightPx, canvas.width, pageCanvas.height, 0, 0, pageCanvas.width, pageCanvas.height)
 
       const pageImgData = pageCanvas.toDataURL('image/png')
       const pageImgHeight = (pageCanvas.height * imgWidth) / pageCanvas.width
-      
-      // Позиция контента (после header)
-      const contentY = props.margin + headerHeightMm
-
-      pdf.addImage(pageImgData, 'PNG', props.margin, contentY, imgWidth, pageImgHeight)
-
-      // Добавляем footer если есть
-      if (footerCanvas) {
-        const footerImgData = footerCanvas.toDataURL('image/png')
-        const footerImgWidth = width - props.margin * 2
-        const footerImgHeight = (footerCanvas.height * footerImgWidth) / footerCanvas.width
-        const footerY = height - props.margin - footerImgHeight
-        pdf.addImage(footerImgData, 'PNG', props.margin, footerY, footerImgWidth, footerImgHeight)
-      }
+      pdf.addImage(pageImgData, 'PNG', props.margin, props.margin, imgWidth, pageImgHeight)
     }
   }
 
   return pdf.output('blob')
+}
+
+const exportPDF = async () => {
+  try {
+    isExporting.value = true
+    emit('export-start')
+
+    const blob = await generatePDFBlob()
+    const url = URL.createObjectURL(blob)
+    const a = document.createElement('a')
+    a.href = url
+    a.download = `${props.title}.pdf`
+    a.click()
+    URL.revokeObjectURL(url)
+
+    emit('export-end', { format: 'pdf', pages: totalPages.value })
+  } catch (error) {
+    console.error('Ошибка экспорта PDF:', error)
+    emit('error', error as Error)
+  } finally {
+    isExporting.value = false
+  }
+}
+
+const exportHTML = async () => {
+  try {
+    isExporting.value = true
+    emit('export-start')
+
+    const content = reportContent.value?.innerHTML
+    const html = `<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>${props.title}</title>
+  <style>
+    @page { size: ${props.pageSize} ${props.orientation}; margin: ${props.margin}mm; }
+    body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; margin: 0; padding: 20px; color: #1a1a1a; }
+    .report-page { page-break-after: always; padding: 30px; border: 1px solid #eee; margin-bottom: 20px; border-radius: 8px; }
+    .report-page:last-child { page-break-after: auto; }
+    table { width: 100%; border-collapse: collapse; margin: 10px 0; }
+    th, td { border: 1px solid #ddd; padding: 8px 12px; text-align: left; }
+    th { background-color: #f5f5f5; font-weight: 600; }
+    h1, h2, h3 { color: #2c3e50; }
+    @media print { body { padding: 0; } .report-page { border: none; } }
+  </style>
+</head>
+<body>
+  <h1 style="text-align: center; margin-bottom: 30px;">${props.title}</h1>
+  ${content}
+</body>
+</html>`
+
+    const blob = new Blob([html], { type: 'text/html;charset=utf-8' })
+    const url = URL.createObjectURL(blob)
+    const a = document.createElement('a')
+    a.href = url
+    a.download = `${props.title}.html`
+    a.click()
+    URL.revokeObjectURL(url)
+
+    emit('export-end', { format: 'html' })
+  } catch (error) {
+    console.error('Ошибка экспорта HTML:', error)
+    emit('error', error as Error)
+  } finally {
+    isExporting.value = false
+  }
 }
 
 const togglePreview = async () => {
@@ -371,7 +368,6 @@ const generatePreview = async () => {
   try {
     isGeneratingPreview.value = true
     cleanupPreview()
-    
     const blob = await generatePDFBlob()
     previewUrl.value = URL.createObjectURL(blob)
   } catch (error) {
@@ -403,151 +399,8 @@ const downloadPreviewPDF = () => {
   }
 }
 
-const prevPage = () => {
-  if (currentPage.value > 0) {
-    currentPage.value--
-    scrollToPage(currentPage.value)
-    emit('page-change', currentPage.value)
-  }
-}
-
-const nextPage = () => {
-  if (currentPage.value < totalPages.value - 1) {
-    currentPage.value++
-    scrollToPage(currentPage.value)
-    emit('page-change', currentPage.value)
-  }
-}
-
-const scrollToPage = (pageIndex: number) => {
-  const pages = reportContent.value?.querySelectorAll('.report-page')
-  
-  if (pages && pages.length > 0 && pages[pageIndex]) {
-    // Ручное деление - прокручиваем к конкретной странице
-    (pages[pageIndex] as HTMLElement).scrollIntoView({ behavior: 'smooth', block: 'start' })
-  } else if (reportContent.value) {
-    // Автоматическая пагинация - прокручиваем к позиции страницы
-    const pageHeight = pageDimensions.value.height * 3.78
-    const scrollPosition = pageIndex * pageHeight
-    reportContent.value.scrollTo({ top: scrollPosition, behavior: 'smooth' })
-  }
-}
-
-const exportPDF = async () => {
-  try {
-    isExporting.value = true
-    emit('export-start')
-
-    const contentEl = reportContent.value
-    if (!contentEl) {
-      throw new Error('Нет контента для экспорта')
-    }
-
-    // Проверяем наличие ручного деления на страницы
-    const manualPages = contentEl.querySelectorAll('.report-page')
-    const pageCount = manualPages.length > 0 ? manualPages.length : Math.ceil(contentEl.scrollHeight / (pageDimensions.value.height * 3.78))
-
-    const blob = await generatePDFBlob()
-    
-    // Скачиваем файл
-    const url = URL.createObjectURL(blob)
-    const a = document.createElement('a')
-    a.href = url
-    a.download = `${props.title}.pdf`
-    a.click()
-    URL.revokeObjectURL(url)
-
-    emit('export-end', { format: 'pdf', pages: pageCount })
-  } catch (error) {
-    console.error('Ошибка экспорта PDF:', error)
-    emit('error', error as Error)
-  } finally {
-    isExporting.value = false
-  }
-}
-
-const exportHTML = async () => {
-  try {
-    isExporting.value = true
-    emit('export-start')
-
-    const content = reportContent.value?.innerHTML
-    const html = `<!DOCTYPE html>
-<html lang="ru">
-<head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>${props.title}</title>
-  <style>
-    @page {
-      size: ${props.pageSize} ${props.orientation};
-      margin: ${props.margin}mm;
-    }
-    body {
-      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
-      margin: 0;
-      padding: 20px;
-      color: #1a1a1a;
-    }
-    .report-page {
-      page-break-after: always;
-      padding: 30px;
-      border: 1px solid #eee;
-      margin-bottom: 20px;
-      border-radius: 8px;
-      min-height: ${pageDimensions.value.height - props.margin * 2}mm;
-    }
-    .report-page:last-child {
-      page-break-after: auto;
-    }
-    table {
-      width: 100%;
-      border-collapse: collapse;
-      margin: 10px 0;
-    }
-    th, td {
-      border: 1px solid #ddd;
-      padding: 8px 12px;
-      text-align: left;
-    }
-    th {
-      background-color: #f5f5f5;
-      font-weight: 600;
-    }
-    h1, h2, h3 { color: #2c3e50; }
-    @media print {
-      body { padding: 0; }
-      .report-page { border: none; box-shadow: none; }
-    }
-  </style>
-</head>
-<body>
-  <h1 style="text-align: center; margin-bottom: 30px;">${props.title}</h1>
-  ${content}
-</body>
-</html>`
-
-    const blob = new Blob([html], { type: 'text/html;charset=utf-8' })
-    const url = URL.createObjectURL(blob)
-    const a = document.createElement('a')
-    a.href = url
-    a.download = `${props.title}.html`
-    a.click()
-    URL.revokeObjectURL(url)
-
-    emit('export-end', { format: 'html' })
-  } catch (error) {
-    console.error('Ошибка экспорта HTML:', error)
-    emit('error', error as Error)
-  } finally {
-    isExporting.value = false
-  }
-}
-
-// Watchers
-watch(() => slots.default, () => {
-  calculatePages()
-}, { deep: true })
+// Lifecycle
+watch(() => props.title, calculatePages)
 
 onMounted(() => {
   calculatePages()
@@ -559,7 +412,7 @@ onUnmounted(() => {
   cleanupPreview()
 })
 
-// Expose methods
+// Expose
 defineExpose({
   exportPDF,
   exportHTML,
@@ -722,55 +575,7 @@ defineExpose({
   box-shadow: 0 2px 12px rgba(0, 0, 0, 0.06);
   min-height: 600px;
   position: relative;
-  transition: box-shadow 0.2s;
 }
-
-:deep(.report-page:hover) {
-  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.1);
-}
-
-/* Предотвращение разрыва элементов при печати */
-:deep(.report-page table) {
-  break-inside: auto;
-}
-
-:deep(.report-page tr) {
-  break-inside: avoid;
-  break-after: auto;
-  page-break-inside: avoid;
-}
-
-:deep(.report-page thead) {
-  display: table-header-group;
-}
-
-:deep(.report-page tfoot) {
-  display: table-footer-group;
-}
-
-:deep(.report-page h1),
-:deep(.report-page h2),
-:deep(.report-page h3),
-:deep(.report-page h4) {
-  break-after: avoid;
-  page-break-after: avoid;
-}
-
-:deep(.report-page .no-break) {
-  break-inside: avoid;
-  page-break-inside: avoid;
-}
-
-/* Повторение заголовков таблиц */
-:deep(.report-page table.repeat-header thead) {
-  display: table-header-group;
-}
-
-:deep(.report-page table.repeat-header tfoot) {
-  display: table-footer-group;
-}
-
-
 
 /* Preview Modal */
 .preview-overlay {
@@ -877,44 +682,6 @@ defineExpose({
   color: #fca5a5;
 }
 
-.preview-pages {
-  display: flex;
-  flex-direction: column;
-  gap: 24px;
-  align-items: center;
-}
-
-.preview-page {
-  background: white;
-  width: 100%;
-  max-width: 700px;
-  min-height: 400px;
-  padding: 40px;
-  border-radius: 8px;
-  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.1);
-  position: relative;
-}
-
-.preview-page-number {
-  position: absolute;
-  top: 10px;
-  right: 14px;
-  font-size: 11px;
-  color: #9ca3af;
-  background: #f9fafb;
-  padding: 2px 8px;
-  border-radius: 4px;
-}
-
-.preview-footer {
-  display: flex;
-  justify-content: center;
-  gap: 12px;
-  padding: 16px 24px;
-  border-top: 1px solid #e5e7eb;
-  background: #f8fafc;
-}
-
 /* Loading */
 .loading-overlay {
   position: absolute;
@@ -949,6 +716,7 @@ defineExpose({
 .fade-enter-active, .fade-leave-active {
   transition: opacity 0.3s ease;
 }
+
 .fade-enter-from, .fade-leave-to {
   opacity: 0;
 }
